@@ -139,3 +139,23 @@ app/.swiftpm/
 app/**/doc/api/
 app/app.*.symbols
 app/app.*.map.json
+
+# ===================================================================
+# Python virtual environments
+# ===================================================================
+functions/.venv/
+agent/.venv/
+
+# Byte-compiled / optimized / DLL files
+**/__pycache__/
+agent/*.py[oc]
+
+# Distribution / packaging
+agent/build/
+agent/dist/
+agent/wheels/
+agent/*.egg-info/
+
+# Other
+functions/*.local
+functions/requirements.txt
