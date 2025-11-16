@@ -27,13 +27,11 @@
   - `firebase_core`, `firebase_auth`: Firebase 連携、認証
   - `cloud_firestore`: Firestore へのリアルタイム接続
   - `web_socket_channel`: WebSocket 通信管理
-  - `mic_stream` / `flutter_sound`: (Web対応) マイクからの生音声ストリーム取得
-  - `audioplayers`: (Web対応) サーバーからの応答音声ストリームの再生
+  - `flutter_sound`: (Web 対応) マイクからの生音声ストリーム取得、および音声再生
 - **バックエンド (ADK Agent):** Python (FastAPI)
   - `fastapi`: API サーバー構築
   - `websockets`: WebSocket エンドポイントの実装
   - `google-adk`: Gemini Live API との接続を管理
-  - `firebase-admin`: Firestore, Auth, Storage へのアクセス
 - **認証:** Firebase Authentication
 - **データベース:** Cloud Firestore
 - **ストレージ:** Cloud Storage for Firebase
@@ -61,11 +59,11 @@
 
 ### 4.2. 一時トークンのライフサイクルと注意点
 
--   **発行のタイミング:** 一時トークンは、新しい WebSocket 接続を開始できる有効期限が**非常に短い**（デフォルトで1分）。そのため、**アプリのログイン時ではなく、WebSocket 接続を確立する直前にリクエストする**必要がある。
--   **有効期限:**
-    -   **新規セッション開始期限 (`newSessionExpireTime`):** デフォルト1分。この時間内に接続を開始しなければトークンは無効になる。
-    -   **接続持続期限 (`expireTime`):** デフォルト30分。一度確立した接続が持続できる時間。
--   **再接続処理:** 接続持続期限が切れた場合や、ネットワークの不安定さにより接続が切断された場合に備え、フロントエンド側には**再度一時トークンを取得して再接続を試みるロジックの実装が必須**となる。
+- **発行のタイミング:** 一時トークンは、新しい WebSocket 接続を開始できる有効期限が**非常に短い**（デフォルトで 1 分）。そのため、**アプリのログイン時ではなく、WebSocket 接続を確立する直前にリクエストする**必要がある。
+- **有効期限:**
+  - **新規セッション開始期限 (`newSessionExpireTime`):** デフォルト 1 分。この時間内に接続を開始しなければトークンは無効になる。
+  - **接続持続期限 (`expireTime`):** デフォルト 30 分。一度確立した接続が持続できる時間。
+- **再接続処理:** 接続持続期限が切れた場合や、ネットワークの不安定さにより接続が切断された場合に備え、フロントエンド側には**再度一時トークンを取得して再接続を試みるロジックの実装が必須**となる。
 
 この方式により、永続的な API キーやサービスアカウントキーをフロントエンドに露出させることなく、低レイテンシなリアルタイム対話を実現できる。
 
@@ -82,7 +80,7 @@
 6.  **[Flutter]** `status: "pending"` の新しいジョブを検知し、UI に「絵を描き始めたよ...」などのインジケーターを表示する。
 7.  **(別途のバックエンドプロセス or Cloud Function)** Firestore の `jobs` コレクションの `onCreate` トリガーが発火する。
 8.  **[Backend Process]** 画像生成 API (Imagen 等) を呼び出し、生成された画像を **Cloud Storage for Firebase** にアップロードする。
-9.  **[Backend Process]** アップロードした画像の**ダウンロードURL**を生成し、`jobs` ドキュメントを更新する。
+9.  **[Backend Process]** アップロードした画像の**ダウンロード URL**を生成し、`jobs` ドキュメントを更新する。
     - `status`: "completed"
     - `downloadUrl`: "https://firebasestorage.googleapis.com/..." (永続的な公開 URL)
 10. **[Flutter]** `status: "completed"` への変更を検知し、UI 上のインジケーターを `Image.network(job.downloadUrl)` を使って生成された画像に差し替える。
@@ -90,10 +88,12 @@
 ## 6. データモデル (Firestore)
 
 ### 概要
-Firestoreのデータモデルは、将来的な機能拡張性とクエリの効率を考慮し、正規化された構造を採用します。ユーザー、会話セッション、メッセージ、ツール、非同期ジョブをそれぞれ独立したコレクションで管理します。
+
+Firestore のデータモデルは、将来的な機能拡張性とクエリの効率を考慮し、正規化された構造を採用します。ユーザー、会話セッション、メッセージ、ツール、非同期ジョブをそれぞれ独立したコレクションで管理します。
 
 ### 1. `users` コレクション
-Firebase Authenticationで認証されたユーザーの情報を保持します。ドキュメントIDはFirebase AuthのUIDとします。
+
+Firebase Authentication で認証されたユーザーの情報を保持します。ドキュメント ID は Firebase Auth の UID とします。
 
 ```
 /users/{user_id}
@@ -102,6 +102,7 @@ Firebase Authenticationで認証されたユーザーの情報を保持します
 ```
 
 ### 2. `chats` コレクション
+
 個々の会話セッションのメタデータを保持します。
 
 ```
@@ -113,6 +114,7 @@ Firebase Authenticationで認証されたユーザーの情報を保持します
 ```
 
 ### 3. `messages` サブコレクション
+
 特定の会話に含まれる全てのメッセージを時系列で保持します。
 
 ```
@@ -126,7 +128,8 @@ Firebase Authenticationで認証されたユーザーの情報を保持します
 ```
 
 ### 4. `image_jobs` コレクション
-画像生成のような非同期で実行されるジョブの状態を管理します。フロントエンドはこれを監視してリアルタイムにUIを更新します。
+
+画像生成のような非同期で実行されるジョブの状態を管理します。フロントエンドはこれを監視してリアルタイムに UI を更新します。
 
 ```
 /image_jobs/{job_id}
@@ -145,9 +148,9 @@ Firebase Authenticationで認証されたユーザーの情報を保持します
 
 ### 7.1. 全般
 
-- **非推奨の記法:** Python および Flutter に関して、2025年10月末時点で公式に非推奨 (deprecated) となっている記法やライブラリの機能は使用しないこと。
+- **非推奨の記法:** Python および Flutter に関して、2025 年 10 月末時点で公式に非推奨 (deprecated) となっている記法やライブラリの機能は使用しないこと。
 - **AI 駆動開発:** コード生成を依頼する際は、本ドキュメント (`AGENTS.md`) をコンテキストとして参照すること。タスクは小さく、具体的に指示すること。AI が生成したコードは必ずレビューし、本規約に準拠しているか確認すること。
-- **最新情報の参照:** 本プロジェクトは最新の技術スタックを採用しているため、調査や実装の際には、Web検索や公式ドキュメントの最新版を積極的に参照すること。
+- **最新情報の参照:** 本プロジェクトは最新の技術スタックを採用しているため、調査や実装の際には、Web 検索や公式ドキュメントの最新版を積極的に参照すること。
 - **不明な情報の明言:** わからないことや未確認の情報は、必ず「現時点では不明です」「確認できませんでした」と明言します。
 - **推測の明示:** 推測を含む場合は、必ず「これは推測ですが、」と前置きします。
 - **出典の添付:** 回答には、必ず情報の根拠となる出典（可能な限り一次情報）を添付します。
@@ -186,21 +189,22 @@ Firebase Authenticationで認証されたユーザーの情報を保持します
   - `ListView.builder` や `GridView.builder` を積極的に使用し、画面外のウィジェットをビルドしないこと。
 - **状態管理:**
   - 状態管理には **Riverpod** を使用し、ウィジェットツリーからビジネスロジックを分離すること。
-  - `setState()` を持つ `StatefulWidget` の使用は、フォームの入力テキストやローカルなUIアニメーションなど、局所的な状態に限定すること。
+  - `setState()` を持つ `StatefulWidget` の使用は、フォームの入力テキストやローカルな UI アニメーションなど、局所的な状態に限定すること。
 - **非同期処理:**
   - `FutureProvider` や `StreamProvider` を活用し、`FutureBuilder` / `StreamBuilder` の手動管理を可能な限り避けること。
 
 ## 8. 参考情報
 
 - **ADK Bidi-streaming (live) Overview:**
+
   - [https://google.github.io/adk-docs/streaming/](https://google.github.io/adk-docs/streaming/)
-  - ADKにおける双方向ストリーミング機能の全体像とアーキテクチャに関する公式ドキュメント。
+  - ADK における双方向ストリーミング機能の全体像とアーキテクチャに関する公式ドキュメント。
 
 - **Streaming Quickstart:**
+
   - [https://google.github.io/adk-docs/get-started/streaming/quickstart-streaming/](https://google.github.io/adk-docs/get-started/streaming/quickstart-streaming/)
-  - ADKのストリーミング機能を試すための公式クイックスタートガイド。
+  - ADK のストリーミング機能を試すための公式クイックスタートガイド。
 
 - **Custom Streaming with WebSocket:**
   - [https://google.github.io/adk-docs/streaming/custom-streaming-ws/](https://google.github.io/adk-docs/streaming/custom-streaming-ws/)
-  - カスタムWebSocketサーバーを実装してADKのストリーミング機能を利用する方法についての詳細なガイド。本プロジェクトのアーキテクチャに密接に関連する。
-
+  - カスタム WebSocket サーバーを実装して ADK のストリーミング機能を利用する方法についての詳細なガイド。本プロジェクトのアーキテクチャに密接に関連する。

@@ -158,4 +158,3 @@ agent/*.egg-info/
 
 # Other
 functions/*.local
-functions/requirements.txt
