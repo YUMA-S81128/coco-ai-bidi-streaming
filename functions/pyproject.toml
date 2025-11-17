@@ -9,3 +9,9 @@ dependencies = [
     "google-auth>=2.43.0",
     "google-genai>=1.50.1",
 ]
+
+[project.optional-dependencies]
+dev = [
+    # リンターとフォーマッターを兼ねる
+    "ruff",
+]
