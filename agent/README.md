@@ -5,16 +5,18 @@
 本ディレクトリは、[Gemini Live Streaming Agent プロジェクト](../AGENTS.md)のバックエンド部分であるADKエージェントの実装です。
 Python, FastAPI, ADK (Agent Development Kit) を用いて構築されており、リアルタイムの音声ストリーミング中継と、会話に応じたツール（画像生成ジョブ発行など）の実行を担当します。
 
-デプロイ先は **Vertex AI Agent Engine** を想定しています。
+デプロイ先は **Google Cloud Run (BFF構成)** です。
 
 ## 2. 主な機能
 
 -   **WebSocketサーバー:**
     -   FastAPIと`websockets`ライブラリを使用し、FlutterクライアントからのWebSocket接続を受け付けます。
-    -   接続は、Cloud Functionsが発行した一時トークンによって認証されます。
+    -   接続パラメータ (`?token=...`) またはヘッダーから送られた Firebase ID トークンを検証し、認証を行います。
 -   **リアルタイムストリーム中継:**
     -   クライアントから受信した音声チャンクを、ADKを介して**Gemini Live API**に転送します。
     -   Gemini Live APIから返却される応答音声チャンクを、リアルタイムでクライアントに転送します。
+-   **セッション管理:**
+    -   Vertex AI Agent Engine (VertexAISessionService) を利用して、会話履歴をクラウド上に永続化します。
 -   **ツール実行:**
     -   会話の中でGeminiが特定のツール（例: 画像生成）を呼び出す判断をした場合、それを検知します。
     -   画像生成プロンプトを取得し、Firestoreの`image_jobs`コレクションに新しいジョブとして登録します。

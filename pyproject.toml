@@ -4,6 +4,8 @@
 # F: Pyflakes (未使用のimportなど)
 # W: pycodestyle warnings
 # I: isort (importの並び替え)
+
+[tool.ruff.lint]
 select = ["E", "F", "W", "I"]
 ignore = []
 

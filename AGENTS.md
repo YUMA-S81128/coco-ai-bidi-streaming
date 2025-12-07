@@ -10,16 +10,15 @@
 
 - **クライアント:** Flutter (Web)
 - **認証:** Firebase Authentication
-- **バックエンド (ADK Agent):** Python (FastAPI, ADK)
-- **バックエンド (トークン発行):** Python (Cloud Functions for Firebase)
+- **バックエンド (BFF/Agent):** Cloud Run (FastAPI + ADK Runner)
 - **リアルタイム通信:** WebSocket
 - **AI モデル:** Gemini Live API (双方向ストリーミング)
-- **データベース/状態管理:** Cloud Firestore
+- **データベース:** Cloud Firestore (UI用チャット履歴, 非同期ジョブ)
+- **セッション/コンテキスト管理:** Vertex AI Agent Engine (VertexAISessionService)
 - **ストレージ:** Cloud Storage for Firebase (生成画像)
 - **デプロイ先:**
   - **フロントエンド:** Firebase Hosting
-  - **ADK エージェント:** Vertex AI Agent Engine
-  - **トークン発行関数:** Cloud Functions for Firebase
+  - **ADK エージェント:** Cloud Run (FastAPI + ADK Runner)
 
 ## 3. 主要な技術スタック
 
@@ -28,44 +27,72 @@
   - `cloud_firestore`: Firestore へのリアルタイム接続
   - `web_socket_channel`: WebSocket 通信管理
   - `flutter_sound`: (Web 対応) マイクからの生音声ストリーム取得、および音声再生
-- **バックエンド (ADK Agent):** Python (FastAPI)
-  - `fastapi`: API サーバー構築
+- **バックエンド:** Python (FastAPI)
+  - `fastapi`: API サーバー構築 (BFF)
   - `websockets`: WebSocket エンドポイントの実装
-  - `google-adk`: Gemini Live API との接続を管理
+  - `google-adk`: Gemini Live API との接続およびセッション管理
+  - `vertexai`: Vertex AI Session Service の利用
 - **認証:** Firebase Authentication
 - **データベース:** Cloud Firestore
 - **ストレージ:** Cloud Storage for Firebase
 - **デプロイ:**
   - **フロントエンド:** Firebase Hosting
-  - **ADK エージェント:** Vertex AI Agent Engine
-  - **トークン発行エンドポイント:** Cloud Functions for Firebase (2nd Gen, Python)
+  - **バックエンド:** Cloud Run (FastAPI + ADK Runner)
 
-## 4. 接続シーケンスとアーキテクチャ (一時トークン方式)
+### 3.1. 補足: Cloud Run デプロイ要件と Vertex AI
+- **APP_NAME:** ADK の `Runner` 機能を使用する場合、アプリケーションを一意に識別する `APP_NAME` の定義が必須となる。
+- **ランタイム構成:** Cloud Run 上で FastAPI を動かし、WebSocket 接続を終端する (BFFパターン)。
+- **Vertex AI Agent Engine の利用:** エージェントのコード自体は Cloud Run に配置するが、**セッション履歴の管理 (Memory)** には `VertexAISessionService` を利用する。そのため、**Vertex AI Agent Engine (Agent Builder) のインスタンス作成**が必須となる（コードのデプロイは不要）。
 
-フロントエンドからバックエンドエージェントへの接続は、セキュリティとパフォーマンスを両立するため、**一時トークン (ephemeral token)** を利用したアーキテクチャを推奨する。
 
-この方式では、フロントエンドは認証用の短命なトークンを使って、Vertex AI Agent Engine 上で稼働する ADK エージェントの WebSocket エンドポイントに直接接続する。エージェントがフロントエンドと Gemini Live API との間のストリーミングを中継する。
+## 4. 接続シーケンスとアーキテクチャ (Cloud Run BFF パターン)
+
+Flutterアプリ（フロントエンド）と Vertex AI Agent Engine（バックエンド）の接続には、**Cloud Run 上の FastAPI を WebSocket 中継サーバー (BFF: Backend For Frontend) として利用する構成**を採用する。
+
+この構成では、認証に **Firebase Authentication の ID トークン** を直接利用し、シンプルかつ堅牢なセキュリティを実現する。
 
 ### 4.1. 接続・ストリーミングフロー
 
-1.  **[トリガー]** ユーザーが対話開始のアクション（例: マイクボタンを押す）を行う。
-2.  **[トークン要求]** フロントエンドは、**Cloud Functions for Firebase (Python) で構築したトークン発行用 HTTP エンドポイント**に対し、一時トークンの発行をリクエストする。この際、Firebase Auth の ID トークンをヘッダーに含め、リクエスト元が認証済みユーザーであることを証明する。
-3.  **[トークン生成]** Cloud Function は、ID トークンを検証後、Vertex AI Agent Engine への接続を認証するための短命な一時トークンを生成し、フロントエンドに返却する。
-4.  **[WebSocket 接続]** フロントエンドは、受け取った一時トークンを使い、**Vertex AI Agent Engine 上で公開されている ADK エージェントの WebSocket エンドポイント**へ接続を確立する。
-5.  **[音声送信]** フロントエンドは、マイクから取得した音声チャンクを WebSocket 経由で ADK エージェントへ継続的に送信する。
-6.  **[ストリーム中継]** ADK エージェントは、フロントエンドから受信した音声チャンクを **Gemini Live API** に転送する。同時に、Gemini Live API から返却される応答音声チャンクをフロントエンドに転送する。この間の処理は ADK が抽象化する。
-7.  **[音声再生]** フロントエンドは、ADK エージェントから受信した応答音声チャンクをバッファし、即座にスピーカーで再生する。
-8.  **[接続終了]** ユーザーが「トーク終了ボタン」を押下するか、会話内の終了意図を ADK エージェントが検知すると、エージェントは Gemini Live API とのセッションを終了し、WebSocket 接続を正常に閉じる。
+1.  **[認証]** ユーザーがアプリにログインし、Firebase Auth から **ID トークン** (JWT) を取得する。
+2.  **[WebSocket 接続]** フロントエンドは取得した ID トークンをクエリパラメータ (`?token=...`) に付与し、**Cloud Run 上の FastAPI (BFF)** の WebSocket エンドポイントに接続する。
+3.  **[トークン検証]** FastAPI は接続要求を受け取ると即座に ID トークンを検証する。無効な場合は接続を拒否 (403/1008) する。
+4.  **[ストリーム中継]** 認証成功後、BFF は内部的に Gemini Live API (Vertex AI) とのセッションを確立し、フロントエンドからの音声/テキストと AI からの応答を**双方向に中継 (Proxy)** する。
 
-### 4.2. 一時トークンのライフサイクルと注意点
+```mermaid
+sequenceDiagram
+    participant App as Flutter App
+    participant Auth as Firebase Auth
+    participant BFF as Cloud Run (FastAPI)
+    participant Vertex as Vertex AI
 
-- **発行のタイミング:** 一時トークンは、新しい WebSocket 接続を開始できる有効期限が**非常に短い**（デフォルトで 1 分）。そのため、**アプリのログイン時ではなく、WebSocket 接続を確立する直前にリクエストする**必要がある。
-- **有効期限:**
-  - **新規セッション開始期限 (`newSessionExpireTime`):** デフォルト 1 分。この時間内に接続を開始しなければトークンは無効になる。
-  - **接続持続期限 (`expireTime`):** デフォルト 30 分。一度確立した接続が持続できる時間。
-- **再接続処理:** 接続持続期限が切れた場合や、ネットワークの不安定さにより接続が切断された場合に備え、フロントエンド側には**再度一時トークンを取得して再接続を試みるロジックの実装が必須**となる。
+    App->>Auth: IDトークン取得
+    App->>BFF: WebSocket接続 (wss://...?token=JWT)
+    BFF->>BFF: IDトークン検証 (Firebase Admin)
+    
+    alt 無効なトークン
+        BFF-->>App: 切断 (Close 1008)
+    else 有効なトークン
+        BFF->>Vertex: セッション確立
+        BFF-->>App: 接続確立 (Open)
+        
+        loop 双方向ストリーミング
+            App->>BFF: 音声送信
+            BFF->>Vertex: 転送
+            Vertex-->>BFF: 音声返信
+            BFF-->>App: 転送
+        end
+    end
+```
 
-この方式により、永続的な API キーやサービスアカウントキーをフロントエンドに露出させることなく、低レイテンシなリアルタイム対話を実現できる。
+### 4.2. Cloud Run の利点
+
+*   **プロトコル変換:** Flutter から扱いやすい WebSocket を、Vertex AI が要求する gRPC/REST にサーバーサイドで変換できる。
+*   **シンプルな認証:** 独自の一時トークン発行サーバーを立てる必要がなく、Firebase の標準的な認証フローで完結する。
+*   **柔軟な制御:** Cloud Run は WebSocket の多数の同時接続 (Concurrent Requests) を効率的に処理でき、タイムアウト時間も設定で最大 60 分まで拡張可能。
+
+**注意点:**
+*   Cloud Run のサービス設定で、リクエストタイムアウトを想定される会話時間（例: 10分〜60分）に合わせて延長すること。
+*   モバイル端末の切断に備え、フロントエンドには自動再接続ロジックを実装すること。
 
 ## 5. シーケンス: 画像生成 (Firestore, Cloud Storage 経緯)
 

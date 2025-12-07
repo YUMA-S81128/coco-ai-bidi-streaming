@@ -145,6 +145,8 @@ app/app.*.map.json
 # ===================================================================
 functions/.venv/
 agent/.venv/
+functions/.ruff_cache/
+agent/.ruff_cache/
 
 # Byte-compiled / optimized / DLL files
 **/__pycache__/
