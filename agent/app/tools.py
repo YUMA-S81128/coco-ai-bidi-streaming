@@ -2,9 +2,8 @@
 
 import logging
 
-from agent.app.sub_agents.image_gen.agent import image_gen_agent
+from agent.app.services.image_gen import generate_image
 from google.adk.tools import ToolContext
-from google.adk.tools.agent_tool import AgentTool
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +14,7 @@ class SessionFinishedException(Exception):
     pass
 
 
-async def end_session_tool():
+async def end_session_tool() -> None:
     """
     ユーザーがさようならを言ったり、停止を求めたりしたときに現在のセッションを終了します。
     """
@@ -23,35 +22,38 @@ async def end_session_tool():
     raise SessionFinishedException("Session ended by user.")
 
 
-async def call_image_gen_agent(
-    request: str,
+async def generate_image_tool(
+    prompt: str,
     tool_context: ToolContext,
     user_id: str | None = None,
     chat_id: str | None = None,
-):
+    message_id: str | None = None,
+) -> str:
     """
-    ユーザーの画像生成リクエストを処理するエージェントを呼び出します。
+    画像を生成します。
+
+    ユーザーが視覚的な表現を求めている場合や、説明を補足するために画像が役立つ場合に、
+    このツールを使用してください。プロンプトには、被写体、スタイル、ムード、
+    構図などの詳細を含めてください。
 
     Args:
-        request: ユーザーからの自然言語による画像生成リクエスト。
-        tool_context: ツール実行コンテキスト。
-        user_id: リクエストしたユーザーのID (自動注入)。
+        prompt: 画像生成のための詳細なプロンプト。
+        tool_context: ツールコンテキスト。
+        user_id: ユーザーID (自動注入)。
         chat_id: チャットID (自動注入)。
+        message_id: メッセージID (自動注入)。
+
+    Returns:
+        画像生成ジョブのステータスメッセージ。
     """
-    logger.info(f"Calling image_gen_agent with request: {request}")
+    logger.info(f"generate_image_tool called with prompt: {prompt[:100]}...")
 
-    # 状態に注入されたパラメータを保存（サブエージェントのツールで使用するため）
-    if user_id:
-        tool_context.state["user_id"] = user_id
-    if chat_id:
-        tool_context.state["chat_id"] = chat_id
+    # Retrieve IDs from context if not provided directly
+    if not user_id:
+        user_id = tool_context.state.get("user_id")
+    if not chat_id:
+        chat_id = tool_context.state.get("chat_id")
+    if not message_id:
+        message_id = tool_context.state.get("message_id")
 
-    agent_tool = AgentTool(agent=image_gen_agent)
-
-    # サブエージェントを実行
-    # args の内容は AgentTool の実装によるが、通常は自然言語入力として渡される
-    result = await agent_tool.run_async(
-        args={"request": request}, tool_context=tool_context
-    )
-
-    return result
+    return await generate_image(prompt, user_id, chat_id, message_id)

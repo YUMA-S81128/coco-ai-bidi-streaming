@@ -1,3 +1,5 @@
+"""Image generation service using Gen AI SDK (Imagen 3)."""
+
 import asyncio
 import logging
 import ssl
@@ -29,11 +31,9 @@ except Exception as e:
 storage_client = storage.Client()
 
 
-# --- Retry Logic (from user snippet) ---
+# --- Retry Logic ---
 def is_ssl_error(exc: BaseException) -> bool:
-    """
-    tenacity predicate: check if exception is SSL related.
-    """
+    """tenacity predicate: check if exception is SSL related."""
     ssl_types = (requests.exceptions.SSLError, UrllibSSLError, ssl.SSLError)
     if isinstance(exc, ssl_types):
         return True
@@ -68,25 +68,19 @@ async def upload_blob_from_memory(
     Returns:
         The GCS URI (gs://bucket/blob_name).
     """
-    logger.info(
-        f"Uploading to GCS: gs://{bucket_name}/{destination_blob_name}"
-    )
+    logger.info(f"Uploading to GCS: gs://{bucket_name}/{destination_blob_name}")
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(destination_blob_name)
 
-    # GCS client is synchronous, so run in thread
     await asyncio.to_thread(blob.upload_from_string, data, content_type=content_type)
 
     gcs_path = f"gs://{bucket_name}/{destination_blob_name}"
     logger.info(f"Uploaded: {gcs_path}")
-
-    # Based on prompt "frontend downloads", and user request for Flutter integration:
-    # return the gs:// path.
     return gcs_path
 
 
-# --- Firestore Helpers (from user snippet) ---
-async def _update_job(db: firestore.AsyncClient, job_id: str, payload: dict):
+# --- Firestore Helpers ---
+async def _update_job(db: firestore.AsyncClient, job_id: str, payload: dict) -> None:
     """Internal helper to update Firestore job."""
     logger.info(f"[{job_id}] Updating job... Payload: {payload}")
     payload["updatedAt"] = firestore.SERVER_TIMESTAMP
@@ -102,7 +96,7 @@ async def _update_job(db: firestore.AsyncClient, job_id: str, payload: dict):
 
 async def update_job_status(
     db: firestore.AsyncClient, job_id: str, status: str, data: dict | None = None
-):
+) -> None:
     """Update job status and optional data."""
     update_payload = {"status": status}
     if data:
@@ -112,14 +106,26 @@ async def update_job_status(
 
 # --- API Call ---
 async def generate_image(
-    prompt: str, user_id: str | None = None, chat_id: str | None = None
+    prompt: str,
+    user_id: str | None = None,
+    chat_id: str | None = None,
+    message_id: str | None = None,
 ) -> str:
     """
-    Generates an image based on the prompt using Imagen 3 (via google-genai).
+    Generates an image using Imagen 3 via Gen AI SDK.
+
+    Args:
+        prompt: The detailed prompt for image generation.
+        user_id: The user ID.
+        chat_id: The chat ID.
+        message_id: The message ID that triggered this generation.
+
+    Returns:
+        A status message indicating success or failure.
     """
     logger.info(
         f"generate_image called: prompt='{prompt}', "
-        f"user_id={user_id}, chat_id={chat_id}"
+        f"user_id={user_id}, chat_id={chat_id}, message_id={message_id}"
     )
 
     if db is None:
@@ -139,6 +145,7 @@ async def generate_image(
             "createdAt": firestore.SERVER_TIMESTAMP,
             "userId": user_id,
             "chatId": chat_id,
+            "messageId": message_id,
         }
         await job_ref.set(job_data)
         logger.info(f"Created job: {job_id}")
@@ -147,38 +154,27 @@ async def generate_image(
         return f"Error creating image job: {e}"
 
     # 2. Run Generation
-    # (Background Task concept, but we await here for the Agent tool)
-    # Ideally this should be a background task if it takes long,
-    # but for simplicity we await.
     try:
         await update_job_status(db, job_id, "processing")
 
-        # Initialize Gen AI Client
         client = genai.Client(
             vertexai=True,
             project=settings.GOOGLE_CLOUD_PROJECT,
-            location=settings.IMAGE_GEN_LOCATION
+            location=settings.IMAGE_GEN_LOCATION,
         )
 
-        # Call Imagen 3
         response = await asyncio.to_thread(
-             client.models.generate_content,
-             model=settings.IMAGE_GEN_MODEL_ID,
-             contents=prompt,
-             config=types.GenerateContentConfig(
-                 response_modalities=['IMAGE'],
-                 image_config=types.ImageConfig(
-                     aspect_ratio="16:9",
-                     # 2K is not a valid enum string usually,
-                     # using 1024x1024 or leaving default might be safer.
-                     # "2K" isn't standard enum.
-                 ),
-             ),
+            client.models.generate_content,
+            model=settings.IMAGE_GEN_MODEL_ID,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE"],
+                image_config=types.ImageConfig(aspect_ratio="16:9"),
+            ),
         )
 
-        # Check for image
         if not response.candidates or not response.candidates[0].content.parts:
-             raise ValueError("No content generated.")
+            raise ValueError("No content generated.")
 
         generated_image_bytes = None
         for part in response.candidates[0].content.parts:
@@ -187,7 +183,7 @@ async def generate_image(
                 break
 
         if not generated_image_bytes:
-             raise ValueError("No image data found in response.")
+            raise ValueError("No image data found in response.")
 
         # 3. Upload to GCS
         filename = f"{job_id}.png"
@@ -195,12 +191,12 @@ async def generate_image(
             settings.GCS_BUCKET_NAME,
             f"generated_images/{filename}",
             generated_image_bytes,
-            "image/png"
+            "image/png",
         )
 
         # 4. Complete
         await update_job_status(db, job_id, "completed", {"imageUrl": image_url})
-        return f"Image generated successfully. Job ID: {job_id}"
+        return f"画像生成ジョブを開始しました。ID: {job_id}"
 
     except Exception as e:
         logger.error(f"Error during image generation: {e}", exc_info=True)
