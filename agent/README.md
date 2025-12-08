@@ -45,8 +45,8 @@ uv venv
 source .venv/bin/activate  # macOS/Linux
 .venv\Scripts\activate    # Windows
 
-# 依存関係のインストール
-uv pip install -r requirements.txt
+# 依存関係のインストール (uv.lock から)
+uv sync
 ```
 
 ### 実行
@@ -54,7 +54,7 @@ uv pip install -r requirements.txt
 FastAPIの開発サーバーを起動します。
 
 ```bash
-uvicorn main:app --reload
+uvicorn agent.main:app --reload
 ```
 
 ### コーディング規約
