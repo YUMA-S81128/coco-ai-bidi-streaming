@@ -9,10 +9,15 @@ logger = logging.getLogger(__name__)
 
 def get_session_service(app_name: str) -> SessionService:
     """
-    環境変数 `SESSION_TYPE` に基づいて SessionService を初期化して返します。
+    環境変数 `SESSION_TYPE` に基づいて SessionService を初期化して返す。
 
-    - "vertexai" (default for non-local): VertexAiSessionService を使用します。
-    - "memory": InMemorySessionService を使用します。
+    Args:
+        app_name: アプリケーション名。
+
+    Returns:
+        初期化された SessionService インスタンス。
+        - "vertexai": VertexAiSessionService を使用 (本番環境向け)。
+        - "memory": InMemorySessionService を使用 (ローカル開発向け)。
     """
     session_type = settings.SESSION_TYPE.lower()
     project_id = settings.GOOGLE_CLOUD_PROJECT

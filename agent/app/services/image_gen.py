@@ -1,8 +1,9 @@
-"""Image generation service using Gen AI SDK (Imagen 3)."""
+"""Gen AI SDK を使用した画像生成サービス。"""
 
 import asyncio
 import logging
 import ssl
+import uuid
 
 import requests
 from agent.app.config import settings
@@ -20,20 +21,30 @@ from urllib3.exceptions import SSLError as UrllibSSLError
 
 logger = logging.getLogger(__name__)
 
-# Firestore Initialization
+# Firestore クライアントの初期化
 try:
     db = firestore.AsyncClient()
 except Exception as e:
     logger.warning(f"Firestore initialize failed: {e}")
     db = None
 
-# GCS Initialization
+# GCS クライアントの初期化
 storage_client = storage.Client()
 
 
-# --- Retry Logic ---
+# --- リトライロジック ---
 def is_ssl_error(exc: BaseException) -> bool:
-    """tenacity predicate: check if exception is SSL related."""
+    """
+    SSL 関連のエラーかどうかを判定する。
+
+    tenacity のリトライ条件として使用される述語関数。
+
+    Args:
+        exc: 発生した例外。
+
+    Returns:
+        SSL 関連のエラーの場合は True。
+    """
     ssl_types = (requests.exceptions.SSLError, UrllibSSLError, ssl.SSLError)
     if isinstance(exc, ssl_types):
         return True
@@ -44,6 +55,7 @@ def is_ssl_error(exc: BaseException) -> bool:
     if isinstance(context, ssl_types):
         return True
     return False
+
 
 
 gcs_retry_decorator = retry(
@@ -63,10 +75,16 @@ async def upload_blob_from_memory(
     content_type: str,
 ) -> str:
     """
-    Uploads bytes to GCS bucket.
+    バイトデータを GCS バケットにアップロードする。
+
+    Args:
+        bucket_name: アップロード先のバケット名。
+        destination_blob_name: アップロード先の Blob 名。
+        data: アップロードするバイトデータ。
+        content_type: コンテンツタイプ (例: "image/png")。
 
     Returns:
-        The GCS URI (gs://bucket/blob_name).
+        GCS URI (gs://bucket/blob_name 形式)。
     """
     logger.info(f"Uploading to GCS: gs://{bucket_name}/{destination_blob_name}")
     bucket = storage_client.bucket(bucket_name)
@@ -79,9 +97,16 @@ async def upload_blob_from_memory(
     return gcs_path
 
 
-# --- Firestore Helpers ---
+# --- Firestore ヘルパー関数 ---
 async def _update_job(db: firestore.AsyncClient, job_id: str, payload: dict) -> None:
-    """Internal helper to update Firestore job."""
+    """
+    Firestore のジョブドキュメントを更新する内部ヘルパー関数。
+
+    Args:
+        db: Firestore の非同期クライアント。
+        job_id: 更新対象のジョブ ID。
+        payload: 更新するデータ。
+    """
     logger.info(f"[{job_id}] Updating job... Payload: {payload}")
     payload["updatedAt"] = firestore.SERVER_TIMESTAMP
     job_ref = db.collection(settings.FIRESTORE_COLLECTION).document(job_id)
@@ -97,14 +122,22 @@ async def _update_job(db: firestore.AsyncClient, job_id: str, payload: dict) -> 
 async def update_job_status(
     db: firestore.AsyncClient, job_id: str, status: str, data: dict | None = None
 ) -> None:
-    """Update job status and optional data."""
+    """
+    ジョブのステータスとオプションデータを更新する。
+
+    Args:
+        db: Firestore の非同期クライアント。
+        job_id: 更新対象のジョブ ID。
+        status: 新しいステータス文字列。
+        data: 追加で更新するデータ (オプション)。
+    """
     update_payload = {"status": status}
     if data:
         update_payload.update(data)
     await _update_job(db, job_id, update_payload)
 
 
-# --- API Call ---
+# --- 画像生成 API ---
 async def generate_image(
     prompt: str,
     user_id: str | None = None,
@@ -112,17 +145,22 @@ async def generate_image(
     message_id: str | None = None,
 ) -> str:
     """
-    Generates an image using Imagen 3 via Gen AI SDK.
+    Gen AI SDK を使用して画像を生成する。
 
     Args:
-        prompt: The detailed prompt for image generation.
-        user_id: The user ID.
-        chat_id: The chat ID.
-        message_id: The message ID that triggered this generation.
+        prompt: 画像生成のための詳細なプロンプト。
+        user_id: ユーザー ID。
+        chat_id: チャット ID。
+        message_id: メッセージ ID。指定されない場合は自動生成される。
 
     Returns:
-        A status message indicating success or failure.
+        処理結果のステータスメッセージ。
     """
+    # message_id が指定されていない場合は UUID を生成
+    if not message_id:
+        message_id = str(uuid.uuid4())
+        logger.info(f"Generated message_id: {message_id}")
+
     logger.info(
         f"generate_image called: prompt='{prompt}', "
         f"user_id={user_id}, chat_id={chat_id}, message_id={message_id}"
@@ -135,7 +173,7 @@ async def generate_image(
         logger.error("GCS_BUCKET_NAME is not set.")
         return "Error: Server configuration error (GCS bucket not set)."
 
-    # 1. Create Job (Pending)
+    # 1. ジョブの作成 (pending 状態)
     try:
         job_ref = db.collection(settings.FIRESTORE_COLLECTION).document()
         job_id = job_ref.id

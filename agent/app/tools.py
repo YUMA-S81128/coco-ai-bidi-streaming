@@ -1,4 +1,4 @@
-"""Tools for the Agent."""
+"""エージェントで使用するツール群。"""
 
 import logging
 
@@ -25,35 +25,27 @@ async def end_session_tool() -> None:
 async def generate_image_tool(
     prompt: str,
     tool_context: ToolContext,
-    user_id: str | None = None,
-    chat_id: str | None = None,
-    message_id: str | None = None,
 ) -> str:
     """
-    画像を生成します。
+    画像を生成する。
 
     ユーザーが視覚的な表現を求めている場合や、説明を補足するために画像が役立つ場合に、
-    このツールを使用してください。プロンプトには、被写体、スタイル、ムード、
-    構図などの詳細を含めてください。
+    このツールを使用する。プロンプトには、被写体、スタイル、ムード、
+    構図などの詳細を含めること。
 
     Args:
         prompt: 画像生成のための詳細なプロンプト。
-        tool_context: ツールコンテキスト。
-        user_id: ユーザーID (自動注入)。
-        chat_id: チャットID (自動注入)。
-        message_id: メッセージID (自動注入)。
+        tool_context: ADK ツールコンテキスト。
 
     Returns:
         画像生成ジョブのステータスメッセージ。
     """
     logger.info(f"generate_image_tool called with prompt: {prompt[:100]}...")
 
-    # Retrieve IDs from context if not provided directly
-    if not user_id:
-        user_id = tool_context.state.get("user_id")
-    if not chat_id:
-        chat_id = tool_context.state.get("chat_id")
-    if not message_id:
-        message_id = tool_context.state.get("message_id")
+    # セッション state からユーザー情報を取得
+    user_id = tool_context.state.get("user_id")
+    chat_id = tool_context.state.get("chat_id")
+    # message_id は image_gen.py で自動生成される
 
-    return await generate_image(prompt, user_id, chat_id, message_id)
+    return await generate_image(prompt, user_id, chat_id)
+
