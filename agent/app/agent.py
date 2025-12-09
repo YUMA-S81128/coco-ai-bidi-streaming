@@ -11,6 +11,6 @@ logger = logging.getLogger(__name__)
 
 agent = Agent(
     model=settings.model_id,
-    system_instruction=ROOT_SYSTEM_INSTRUCTION,
+    instruction=ROOT_SYSTEM_INSTRUCTION,
     tools=[generate_image_tool, end_session_tool],
 )
