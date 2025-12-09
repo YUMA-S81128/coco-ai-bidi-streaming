@@ -1,12 +1,27 @@
 rules_version = '2';
 
-// Craft rules based on data in your Firestore database
-// allow write: if firestore.get(
-//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
   match /b/{bucket}/o {
+    
+    // Helper function to check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if the user is the owner of the path
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Deny access to the root by default
     match /{allPaths=**} {
       allow read, write: if false;
+    }
+
+    // Allow access to user-specific generated images directories
+    // Path structure: generated_images/{userId}/{filename}
+    match /generated_images/{userId}/{allPaths=**} {
+      allow read, write: if isOwner(userId);
     }
   }
 }
