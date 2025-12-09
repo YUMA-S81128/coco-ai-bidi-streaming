@@ -80,12 +80,12 @@ steps:
             --platform managed \
             --region ${_GOOGLE_CLOUD_LOCATION} \
             --service-account ${_BACKEND_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com \
-            --no-allow-unauthenticated \
+            --allow-unauthenticated \
             --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${_GOOGLE_CLOUD_LOCATION},GCS_BUCKET_NAME=${PROJECT_ID}-generated-images,SESSION_TYPE=${_SESSION_TYPE},VERTEX_AI_AGENT_ENGINE_ID=${_VERTEX_AI_AGENT_ENGINE_ID},GOOGLE_GENAI_USE_VERTEXAI=true" \
             --project=${PROJECT_ID}
           
-          # Allow scale to zero
-          gcloud run services update ${_BACKEND_SERVICE_NAME} --region ${_GOOGLE_CLOUD_LOCATION} --min 0 --project=${PROJECT_ID}
+          # Allow scale to zero, Limit max instances to 1 for cost control (Demo/PoC)
+          gcloud run services update ${_BACKEND_SERVICE_NAME} --region ${_GOOGLE_CLOUD_LOCATION} --min 0 --max-instances 1 --project=${PROJECT_ID}
         fi
 
   # --- Step 5: Deploy Frontend to Hosting ---
