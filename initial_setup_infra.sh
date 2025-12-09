@@ -121,6 +121,37 @@ else
     --description="Docker repository for Coco-AI-Bidi-Streaming"
 fi
 
+# クリーンアップポリシーの設定（最新3バージョンのみ保持）
+echo "--- Artifact Registry クリーンアップポリシーを設定しています ---"
+CLEANUP_POLICY_FILE=$(mktemp)
+cat > "${CLEANUP_POLICY_FILE}" <<EOF
+[
+  {
+    "name": "keep-latest-3",
+    "action": {"type": "Keep"},
+    "mostRecentVersions": {
+      "keepCount": 3
+    }
+  },
+  {
+    "name": "delete-untagged",
+    "action": {"type": "Delete"},
+    "condition": {
+      "tagState": "UNTAGGED",
+      "olderThan": "86400s"
+    }
+  }
+]
+EOF
+
+gcloud artifacts repositories set-cleanup-policies ${ARTIFACT_REGISTRY_REPO} \
+  --location=${GOOGLE_CLOUD_LOCATION} \
+  --policy="${CLEANUP_POLICY_FILE}" \
+  --project=${GOOGLE_CLOUD_PROJECT}
+
+rm "${CLEANUP_POLICY_FILE}"
+echo "クリーンアップポリシーを設定しました: タグ付きイメージは最新3バージョン保持、未タグは24時間後に削除"
+
 # --- 4. Firestore ---
 echo "--- Firestore を設定しています ---"
 if ! gcloud firestore databases describe --project=${GOOGLE_CLOUD_PROJECT} >/dev/null 2>&1; then
