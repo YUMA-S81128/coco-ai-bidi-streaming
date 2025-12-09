@@ -1,3 +1,6 @@
+from functools import lru_cache
+
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,20 +10,53 @@ class Settings(BaseSettings):
     Cloud Build環境では環境変数を読み込み、ローカル開発では.envファイルを利用する。
     """
 
-    MODEL_ID: str = "gemini-live-2.5-flash-preview-native-audio-09-2025"
-    LOCATION: str = "global"
+    # Model Settings
+    ## Bidi-Streaming
+    model_id: str = Field(
+        default="gemini-live-2.5-flash-preview-native-audio-09-2025",
+        description="Bidi-Streaming用のモデルID",
+    )
+    ## Image Generation
+    image_gen_model_id: str = Field(
+        default="gemini-3-pro-image-preview", description="画像生成用のモデルID"
+    )
+    image_gen_location: str = Field(
+        default="global", description="画像生成用のロケーション"
+    )
 
-    # Session service settings
-    SESSION_TYPE: str = "vertexai"
-    GOOGLE_CLOUD_PROJECT: str | None = None
-    GOOGLE_CLOUD_LOCATION: str = "asia-northeast1"
-    VERTEX_AI_AGENT_ENGINE_ID: str | None = None
+    # General Google Cloud Settings
+    google_cloud_project: str | None = Field(
+        default=None, description="Google CloudプロジェクトID"
+    )
+    google_cloud_location: str = Field(
+        default="asia-northeast1", description="Google Cloudロケーション"
+    )
 
-    # Image Generation & Storage settings
-    FIRESTORE_COLLECTION: str = "image_jobs"
-    GCS_BUCKET_NAME: str | None = None
-    IMAGE_GEN_MODEL_ID: str = "gemini-3-pro-image-preview"
-    IMAGE_GEN_LOCATION: str = "global"
+    # Vertex AI Agent Engine Settings
+    vertex_ai_agent_engine_id: str | None = Field(
+        default=None, description="Vertex AI Agent Engine ID"
+    )
+    session_type: str = Field(default="vertexai", description="セッションタイプ")
+
+    # Firestore Settings
+    image_jobs_collection: str = Field(
+        default="image_jobs", description="画像生成ジョブ管理用のコレクション名"
+    )
+    users_collection: str = Field(
+        default="users", description="ユーザー情報管理用のコレクション名"
+    )
+    chats_collection: str = Field(
+        default="chats", description="チャットセッション管理用のコレクション名"
+    )
+    messages_collection: str = Field(
+        default="messages",
+        description="チャットメッセージ履歴管理用のサブコレクション名",
+    )
+
+    # Cloud Storage Settings
+    gcs_bucket_name: str | None = Field(
+        default=None, description="生成した画像を保存するGCSバケット名"
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -31,4 +67,12 @@ class Settings(BaseSettings):
     )
 
 
-settings = Settings()
+@lru_cache
+def get_settings() -> Settings:
+    """
+    アプリケーション設定をシングルトンとして取得し、キャッシュする関数。
+    """
+    return Settings()
+
+
+settings = get_settings()

@@ -1,12 +1,13 @@
 import asyncio
 import logging
 
-from agent.app.tools import SessionFinishedException
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from firebase_admin import auth
 from google.adk.agents.live_request_queue import LiveRequestQueue
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.genai import types
+
+from app.tools import SessionFinishedException
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -54,7 +55,7 @@ async def websocket_endpoint(
     # 認証成功後、WebSocket 接続を受け入れ
     await websocket.accept()
     logger.info(
-        f"WebSocket 接続確立: user_id={user_id}, chat_id={chat_id}, mode={response_mode}"
+        f"WebSocket 接続確立: user_id={user_id}, chat_id={chat_id}, mode={response_mode}"  # noqa: E501
     )
 
     # main.py で設定された Runner と SessionService を取得
