@@ -10,13 +10,13 @@ logger = logging.getLogger(__name__)
 
 def get_session_service(app_name: str) -> BaseSessionService:
     """
-    環境変数 `SESSION_TYPE` に基づいて SessionService を初期化して返す。
+    環境変数 `SESSION_TYPE` に基づいて BaseSessionService を初期化して返す。
 
     Args:
         app_name: アプリケーション名。
 
     Returns:
-        初期化された SessionService インスタンス。
+        初期化された BaseSessionService インスタンス。
         - "vertexai": VertexAiSessionService を使用 (本番環境向け)。
         - "memory": InMemorySessionService を使用 (ローカル開発向け)。
     """
