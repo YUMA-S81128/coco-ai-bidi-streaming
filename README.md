@@ -51,31 +51,48 @@ export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
 ### 3. Vertex AI Agent Engine の手動作成
 セッション管理用の Agent Engine インスタンスは、現時点で `gcloud` コマンドだけで作成することが難しいため、以下の Python スクリプトを実行して作成してください。
 
-Cloud Shell またはローカル環境で、`google-genai` ライブラリをインストール後に実行します。
+この方法では、`identity_type=AGENT_IDENTITY` を使用して**コードをデプロイせずにIDのみを持つインスタンス**を作成します。これにより、事前にIAM権限を設定することが可能です。
+
+Cloud Shell またはローカル環境で、`google-cloud-aiplatform` ライブラリをインストール後に実行します。
 
 ```bash
-pip install google-genai
+pip install google-cloud-aiplatform
 ```
 
 ```python
-from google import genai
+import vertexai
+from vertexai import types
 import os
 
 # プロジェクトIDとロケーションを設定
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "YOUR_PROJECT_ID")
 LOCATION = "asia-northeast1"
 
-client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION)
+# Clientの初期化 (v1beta1 APIを使用)
+client = vertexai.Client(
+    project=PROJECT_ID,
+    location=LOCATION,
+    http_options=dict(api_version="v1beta1")
+)
 
+# Agent Engine インスタンスの作成 (コードなし、IDのみ)
 try:
-    agent_engine = client.agent_engines.create(
-        display_name="coco-ai-bidi-session-service",
-        description="Session management for Coco-AI Bidi Streaming"
+    print("Creating Agent Engine (Identity Only)...")
+
+    remote_agent = client.agent_engines.create(
+        config={
+            "identity_type": types.IdentityType.AGENT_IDENTITY
+        }
     )
-    print(f"Agent Engine ID: {agent_engine.name} created successfully.")
+
+    print("✅ Created successfully.")
+    print(f"Resource Name: {remote_agent.name}")
+
 except Exception as e:
     print(f"Error creating Agent Engine: {e}")
 ```
+
+> **Note**: 作成後に表示される `Resource Name` から Agent Engine ID (例: `1234567890123456789`) を取得し、`cloudbuild.yaml` の `_VERTEX_AI_AGENT_ENGINE_ID` に設定してください。
 
 ### 4. Cloud Build トリガーの手動作成
 GitHub リポジトリとの連携およびトリガーの作成は手動で行う必要があります。
@@ -83,8 +100,8 @@ GitHub リポジトリとの連携およびトリガーの作成は手動で行�
 1. Google Cloud コンソールの Cloud Build トリガーページを開きます。
 2. **「リポジトリを接続」** をクリックし、このプロジェクトの GitHub リポジトリを接続します。
 3. **「トリガーを作成」** をクリックし、以下の設定でトリガーを作成します。
-    - **名前**: `deploy-backend` (任意)
-    - **イベント**: ブランチへの push
+    - **名前**: `deploy-pipeline` (任意)
+    - **イベント**: 例: ブランチへの push
     - **ソース**: 接続したリポジトリとブランチ (例: `main`)
     - **構成**: Cloud Build 構成ファイル (yaml または json)
     - **場所**: `cloudbuild.yaml` (リポジトリルート)
