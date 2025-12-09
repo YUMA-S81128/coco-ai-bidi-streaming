@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 agent = Agent(
-    name="Coco-Ai Live Agent",
+    name="coco_ai_live_agent",
     model=settings.model_id,
     instruction=ROOT_SYSTEM_INSTRUCTION,
     tools=[generate_image_tool, end_session_tool],
