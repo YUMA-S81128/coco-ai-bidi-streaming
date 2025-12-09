@@ -39,7 +39,7 @@ def get_session_service(app_name: str) -> BaseSessionService:
             return InMemorySessionService()
 
         return VertexAiSessionService(
-            project_id=project_id,
+            project=project_id,
             location=location,
             agent_engine_id=settings.vertex_ai_agent_engine_id,
         )
