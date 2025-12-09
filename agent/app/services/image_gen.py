@@ -108,7 +108,7 @@ async def _update_job(db: firestore.AsyncClient, job_id: str, payload: dict) -> 
     """
     logger.info(f"[{job_id}] Updating job... Payload: {payload}")
     payload["updatedAt"] = firestore.SERVER_TIMESTAMP
-    job_ref = db.collection(settings.firestore_collection).document(job_id)
+    job_ref = db.collection(settings.image_jobs_collection).document(job_id)
 
     try:
         await job_ref.set(payload, merge=True)
@@ -174,7 +174,7 @@ async def generate_image(
 
     # 1. ジョブの作成 (pending 状態)
     try:
-        job_ref = db.collection(settings.firestore_collection).document()
+        job_ref = db.collection(settings.image_jobs_collection).document()
         job_id = job_ref.id
         job_data = {
             "prompt": prompt,

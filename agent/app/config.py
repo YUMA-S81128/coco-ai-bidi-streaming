@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     session_type: str = Field(default="vertexai", description="セッションタイプ")
 
     # Firestore Settings
-    firestore_collection: str = Field(
+    image_jobs_collection: str = Field(
         default="image_jobs", description="画像生成ジョブ管理用のコレクション名"
     )
     users_collection: str = Field(
@@ -54,7 +54,9 @@ class Settings(BaseSettings):
     )
 
     # Cloud Storage Settings
-    gcs_bucket_name: str | None = Field(default=None, description="GCSバケット名")
+    gcs_bucket_name: str | None = Field(
+        default=None, description="生成した画像を保存するGCSバケット名"
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",
