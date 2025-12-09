@@ -19,9 +19,9 @@ def get_session_service(app_name: str) -> SessionService:
         - "vertexai": VertexAiSessionService を使用 (本番環境向け)。
         - "memory": InMemorySessionService を使用 (ローカル開発向け)。
     """
-    session_type = settings.SESSION_TYPE.lower()
-    project_id = settings.GOOGLE_CLOUD_PROJECT
-    location = settings.GOOGLE_CLOUD_LOCATION
+    session_type = settings.session_type.lower()
+    project_id = settings.google_cloud_project
+    location = settings.google_cloud_location
 
     logger.info(f"Initializing SessionService with type: {session_type}")
 
@@ -37,7 +37,7 @@ def get_session_service(app_name: str) -> SessionService:
         return VertexAiSessionService(
             project_id=project_id,
             location=location,
-            agent_engine_id=settings.VERTEX_AI_AGENT_ENGINE_ID,
+            agent_engine_id=settings.vertex_ai_agent_engine_id,
         )
     elif session_type == "memory":
         return InMemorySessionService()
