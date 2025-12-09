@@ -1,23 +1,26 @@
 steps:
   # --- Step 0: Get Secrets from Secret Manager ---
+  # frontendビルドでのみ必要なFirebase設定をSecret Managerから取得
   - name: "gcr.io/cloud-builders/gcloud:latest"
     id: "Get Firebase Secrets"
     entrypoint: "bash"
     args:
       - -c
       - |
-        SECRET_KEYS=(
-          "FIREBASE_API_KEY"
-          "FIREBASE_APP_ID"
-          "FIREBASE_MESSAGING_SENDER_ID"
-          "FIREBASE_PROJECT_ID"
-          "FIREBASE_STORAGE_BUCKET"
-          "FIREBASE_AUTH_DOMAIN"
-        )
-        for KEY in "$${SECRET_KEYS[@]}"; do
-          VALUE=$$(gcloud secrets versions access latest --secret="$${KEY}" --project=${PROJECT_ID})
-          echo "export $${KEY}=$${VALUE}" >> /workspace/firebase_env.sh
-        done
+        if [[ "${_DEPLOY_TARGET}" == "all" || "${_DEPLOY_TARGET}" == "frontend" ]]; then
+          SECRET_KEYS=(
+            "FIREBASE_API_KEY"
+            "FIREBASE_APP_ID"
+            "FIREBASE_MESSAGING_SENDER_ID"
+            "FIREBASE_PROJECT_ID"
+            "FIREBASE_STORAGE_BUCKET"
+            "FIREBASE_AUTH_DOMAIN"
+          )
+          for KEY in "$${SECRET_KEYS[@]}"; do
+            VALUE=$$(gcloud secrets versions access latest --secret="$${KEY}" --project=${PROJECT_ID})
+            echo "export $${KEY}=$${VALUE}" >> /workspace/firebase_env.sh
+          done
+        fi
 
   # --- Step 1: Build Frontend (Flutter Web) ---
   - name: "ghcr.io/cirruslabs/flutter:3.35.7"
@@ -26,7 +29,7 @@ steps:
     args:
       - -c
       - |
-        if [[ "${_DEPLOY_TARGET}" == "all" || "${_DEPLOY_TARGET}" == "app" ]]; then
+        if [[ "${_DEPLOY_TARGET}" == "all" || "${_DEPLOY_TARGET}" == "frontend" ]]; then
           echo ">>> Building Flutter web app..."
           cd app
           source /workspace/firebase_env.sh
@@ -95,7 +98,7 @@ steps:
     args:
       - -c
       - |
-        if [[ "${_DEPLOY_TARGET}" == "all" || "${_DEPLOY_TARGET}" == "app" ]]; then
+        if [[ "${_DEPLOY_TARGET}" == "all" || "${_DEPLOY_TARGET}" == "frontend" ]]; then
           firebase deploy --only hosting --project=${PROJECT_ID}
         fi
 
