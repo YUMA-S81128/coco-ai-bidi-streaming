@@ -2,8 +2,9 @@
 
 import logging
 
-from agent.app.services.image_gen import generate_image
 from google.adk.tools import ToolContext
+
+from app.services.image_gen import generate_image
 
 logger = logging.getLogger(__name__)
 
@@ -48,4 +49,3 @@ async def generate_image_tool(
     # message_id は image_gen.py で自動生成される
 
     return await generate_image(prompt, user_id, chat_id)
-

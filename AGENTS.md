@@ -42,7 +42,7 @@
 ### 3.1. 補足: Cloud Run デプロイ要件と Vertex AI
 - **APP_NAME:** ADK の `Runner` 機能を使用する場合、アプリケーションを一意に識別する `APP_NAME` の定義が必須となる。
 - **ランタイム構成:** Cloud Run 上で FastAPI を動かし、WebSocket 接続を終端する (BFFパターン)。
-- **Vertex AI Agent Engine の利用:** エージェントのコード自体は Cloud Run に配置するが、**セッション履歴の管理 (Memory)** には `VertexAISessionService` を利用する。そのため、**Vertex AI Agent Engine (Agent Builder) のインスタンス作成**が必須となる（コードのデプロイは不要）。
+- **Vertex AI Agent Engine の利用:** エージェントのコード自体は Cloud Run に配置するが、**セッション履歴の管理 (Memory)** には `VertexAISessionService` を利用する。そのため、**Vertex AI Agent Engine のインスタンス作成**が必須となる（コードのデプロイは不要）。
 
 
 ## 4. 接続シーケンスとアーキテクチャ (Cloud Run BFF パターン)

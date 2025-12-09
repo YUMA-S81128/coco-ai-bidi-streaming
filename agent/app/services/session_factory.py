@@ -1,27 +1,31 @@
 import logging
 
-from agent.app.config import settings
-from google.adk.sessions import InMemorySessionService, SessionService
-from google.adk.vertexai import VertexAiSessionService
+from google.adk.sessions import (
+    BaseSessionService,
+    InMemorySessionService,
+    VertexAiSessionService,
+)
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 
-def get_session_service(app_name: str) -> SessionService:
+def get_session_service(app_name: str) -> BaseSessionService:
     """
-    環境変数 `SESSION_TYPE` に基づいて SessionService を初期化して返す。
+    環境変数 `SESSION_TYPE` に基づいて BaseSessionService を初期化して返す。
 
     Args:
         app_name: アプリケーション名。
 
     Returns:
-        初期化された SessionService インスタンス。
+        初期化された BaseSessionService インスタンス。
         - "vertexai": VertexAiSessionService を使用 (本番環境向け)。
         - "memory": InMemorySessionService を使用 (ローカル開発向け)。
     """
-    session_type = settings.SESSION_TYPE.lower()
-    project_id = settings.GOOGLE_CLOUD_PROJECT
-    location = settings.GOOGLE_CLOUD_LOCATION
+    session_type = settings.session_type.lower()
+    project_id = settings.google_cloud_project
+    location = settings.google_cloud_location
 
     logger.info(f"Initializing SessionService with type: {session_type}")
 
@@ -35,9 +39,9 @@ def get_session_service(app_name: str) -> SessionService:
             return InMemorySessionService()
 
         return VertexAiSessionService(
-            project_id=project_id,
+            project=project_id,
             location=location,
-            agent_engine_id=settings.VERTEX_AI_AGENT_ENGINE_ID,
+            agent_engine_id=settings.vertex_ai_agent_engine_id,
         )
     elif session_type == "memory":
         return InMemorySessionService()

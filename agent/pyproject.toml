@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "agent"
 version = "0.1.0"
@@ -23,6 +27,12 @@ dependencies = [
 dev = [
     "ruff>=0.14.5",
 ]
+
+[tool.setuptools]
+# パッケージとして含めるディレクトリを明示的に指定
+packages = ["app", "app.routers", "app.services"]
+# パッケージとして含めるトップレベルのPythonモジュールを明示的に指定
+py-modules = ["main"]
 
 [tool.ruff]
 extend = "../pyproject.toml"

@@ -6,7 +6,6 @@ import ssl
 import uuid
 
 import requests
-from agent.app.config import settings
 from google import genai
 from google.cloud import firestore, storage
 from google.genai import types
@@ -18,6 +17,8 @@ from tenacity import (
     wait_exponential,
 )
 from urllib3.exceptions import SSLError as UrllibSSLError
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,6 @@ def is_ssl_error(exc: BaseException) -> bool:
     if isinstance(context, ssl_types):
         return True
     return False
-
 
 
 gcs_retry_decorator = retry(
@@ -109,7 +109,7 @@ async def _update_job(db: firestore.AsyncClient, job_id: str, payload: dict) -> 
     """
     logger.info(f"[{job_id}] Updating job... Payload: {payload}")
     payload["updatedAt"] = firestore.SERVER_TIMESTAMP
-    job_ref = db.collection(settings.FIRESTORE_COLLECTION).document(job_id)
+    job_ref = db.collection(settings.image_jobs_collection).document(job_id)
 
     try:
         await job_ref.set(payload, merge=True)
@@ -169,13 +169,13 @@ async def generate_image(
     if db is None:
         return "Error: Firestore not initialized."
 
-    if not settings.GCS_BUCKET_NAME:
+    if not settings.gcs_bucket_name:
         logger.error("GCS_BUCKET_NAME is not set.")
         return "Error: Server configuration error (GCS bucket not set)."
 
     # 1. ジョブの作成 (pending 状態)
     try:
-        job_ref = db.collection(settings.FIRESTORE_COLLECTION).document()
+        job_ref = db.collection(settings.image_jobs_collection).document()
         job_id = job_ref.id
         job_data = {
             "prompt": prompt,
@@ -197,13 +197,13 @@ async def generate_image(
 
         client = genai.Client(
             vertexai=True,
-            project=settings.GOOGLE_CLOUD_PROJECT,
-            location=settings.IMAGE_GEN_LOCATION,
+            project=settings.google_cloud_project,
+            location=settings.image_gen_location,
         )
 
         response = await asyncio.to_thread(
             client.models.generate_content,
-            model=settings.IMAGE_GEN_MODEL_ID,
+            model=settings.image_gen_model_id,
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_modalities=["IMAGE"],
@@ -226,7 +226,7 @@ async def generate_image(
         # 3. Upload to GCS
         filename = f"{job_id}.png"
         image_url = await upload_blob_from_memory(
-            settings.GCS_BUCKET_NAME,
+            settings.gcs_bucket_name,
             f"generated_images/{filename}",
             generated_image_bytes,
             "image/png",
