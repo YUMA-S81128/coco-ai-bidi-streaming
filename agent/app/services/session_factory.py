@@ -1,7 +1,10 @@
 import logging
 
-from google.adk.sessions import BaseSessionService, InMemorySessionService
-from google.adk.vertexai import VertexAiSessionService
+from google.adk.sessions import (
+    BaseSessionService,
+    InMemorySessionService,
+    VertexAiSessionService,
+)
 
 from app.config import settings
 
