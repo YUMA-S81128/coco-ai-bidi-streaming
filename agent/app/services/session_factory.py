@@ -1,6 +1,6 @@
 import logging
 
-from google.adk.sessions import InMemorySessionService, SessionService
+from google.adk.sessions import BaseSessionService, InMemorySessionService
 from google.adk.vertexai import VertexAiSessionService
 
 from app.config import settings
@@ -8,7 +8,7 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
-def get_session_service(app_name: str) -> SessionService:
+def get_session_service(app_name: str) -> BaseSessionService:
     """
     環境変数 `SESSION_TYPE` に基づいて SessionService を初期化して返す。
 
