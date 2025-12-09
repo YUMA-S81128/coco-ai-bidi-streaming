@@ -1,8 +1,9 @@
 import logging
 
-from agent.app.config import settings
 from google.adk.sessions import InMemorySessionService, SessionService
 from google.adk.vertexai import VertexAiSessionService
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 

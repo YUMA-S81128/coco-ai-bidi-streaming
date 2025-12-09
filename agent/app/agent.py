@@ -1,9 +1,10 @@
 import logging
 
-from agent.app.config import settings
-from agent.app.prompts import ROOT_SYSTEM_INSTRUCTION
-from agent.app.tools import end_session_tool, generate_image_tool
 from google.adk import Agent
+
+from app.config import settings
+from app.prompts import ROOT_SYSTEM_INSTRUCTION
+from app.tools import end_session_tool, generate_image_tool
 
 logger = logging.getLogger(__name__)
 

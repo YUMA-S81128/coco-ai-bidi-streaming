@@ -1,11 +1,12 @@
 import logging
 
 import firebase_admin
-from agent.app.agent import agent
-from agent.app.routers import websocket
-from agent.app.services.session_factory import get_session_service
 from fastapi import FastAPI
 from google.adk.runners import Runner
+
+from app.agent import agent
+from app.routers import websocket
+from app.services.session_factory import get_session_service
 
 # ログ設定
 logging.basicConfig(

@@ -6,7 +6,6 @@ import ssl
 import uuid
 
 import requests
-from agent.app.config import settings
 from google import genai
 from google.cloud import firestore, storage
 from google.genai import types
@@ -18,6 +17,8 @@ from tenacity import (
     wait_exponential,
 )
 from urllib3.exceptions import SSLError as UrllibSSLError
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
