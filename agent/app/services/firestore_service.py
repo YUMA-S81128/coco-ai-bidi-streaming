@@ -77,6 +77,7 @@ async def ensure_chat_exists(
             chat_data = {
                 "userId": user_id,
                 "title": "",  # タイトルは後でエージェントが設定
+                "sessionId": None,  # ADK セッション ID（自動生成後に設定）
                 "createdAt": firestore.SERVER_TIMESTAMP,
                 "updatedAt": firestore.SERVER_TIMESTAMP,
             }
@@ -89,6 +90,55 @@ async def ensure_chat_exists(
     except Exception as e:
         logger.error(f"Error ensuring chat exists: {e}", exc_info=True)
         return False
+
+
+async def get_session_id_for_chat(chat_id: str) -> str | None:
+    """
+    チャットに紐付く ADK セッション ID を取得する。
+
+    Args:
+        chat_id: チャットセッションの ID。
+
+    Returns:
+        ADK セッション ID、または未設定の場合は None。
+    """
+    if db is None:
+        return None
+
+    try:
+        chat_ref = db.collection(settings.chats_collection).document(chat_id)
+        doc = await chat_ref.get()
+        if doc.exists:
+            return doc.to_dict().get("sessionId")
+        return None
+    except Exception as e:
+        logger.error(f"Error getting session ID: {e}", exc_info=True)
+        return None
+
+
+async def set_session_id_for_chat(chat_id: str, session_id: str) -> None:
+    """
+    チャットに ADK セッション ID を設定する。
+
+    Args:
+        chat_id: チャットセッションの ID。
+        session_id: ADK セッション ID。
+    """
+    if db is None:
+        logger.warning("Firestore not initialized. Skipping session ID update.")
+        return
+
+    try:
+        chat_ref = db.collection(settings.chats_collection).document(chat_id)
+        await chat_ref.update(
+            {
+                "sessionId": session_id,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            }
+        )
+        logger.info(f"Updated chat {chat_id} with session ID: {session_id}")
+    except Exception as e:
+        logger.error(f"Error setting session ID: {e}", exc_info=True)
 
 
 async def save_message(

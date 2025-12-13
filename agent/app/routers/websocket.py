@@ -72,25 +72,43 @@ async def websocket_endpoint(
     session_service = websocket.app.state.session_service
     app_name = websocket.app.state.app_name
 
-    # セッションIDとして chat_id を使用
-    session_id = chat_id
-
     # セッションの取得または作成
-    # state にユーザー情報を設定し、ツールからアクセス可能にする
-    session = await session_service.get_session(
-        app_name=app_name, user_id=user_id, session_id=session_id
+    # VertexAiSessionService は pre-set session_id をサポートしないため、
+    # Firestore に保存された session_id を使用するか、新規作成する
+    from app.services.firestore_service import (
+        get_session_id_for_chat,
+        set_session_id_for_chat,
     )
+
+    session = None
+    session_id = await get_session_id_for_chat(chat_id)
+
+    if session_id:
+        # 既存のセッション ID がある場合は取得を試みる
+        session = await session_service.get_session(
+            app_name=app_name, user_id=user_id, session_id=session_id
+        )
+        logger.info(f"Retrieved existing session: {session_id}")
+
     if not session:
-        await session_service.create_session(
+        # セッションが存在しない場合は新規作成（session_id は自動生成）
+        session = await session_service.create_session(
             app_name=app_name,
             user_id=user_id,
-            session_id=session_id,
             state={
                 "user_id": user_id,
                 "chat_id": chat_id,
                 "is_new_chat": is_new_chat,
             },
         )
+        # 自動生成された session_id を Firestore に保存
+        if session and session.id:
+            await set_session_id_for_chat(chat_id, session.id)
+            logger.info(f"Created new session: {session.id} for chat: {chat_id}")
+        else:
+            logger.error("Failed to create session")
+            await websocket.close(code=1011, reason="Failed to create session")
+            return
 
     # LiveRequestQueue の作成
     live_request_queue = LiveRequestQueue()

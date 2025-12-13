@@ -23,12 +23,12 @@ Flutter (Web) を用いて構築されており、リアルタイムの音声ス
 -   **データモデル:** [freezed](https://pub.dev/packages/freezed) を利用したイミュータブルなクラス
 -   **リアルタイム通信:**
     -   `web_socket_channel` を使用し、バックエンドのADKエージェントとWebSocketで接続します。
-    -   接続には、Cloud Functionsが発行する一時トークンを利用します。
--   **データベース:** `cloud_firestore` を介してFirestoreに接続し、画像生成ジョブの状態をリアルタイムで監視します。
+    -   接続には、Firebase Authentication の ID トークンを直接利用します（クエリパラメータ `?token=...&chat_id=...`）。
+-   **データベース:** `cloud_firestore` を介してFirestoreに接続し、チャット履歴と画像生成ジョブの状態をリアルタイムで監視します。
 -   **認証:** `firebase_auth` を利用したFirebase Authentication
 -   **音声入出力:**
-    -   マイク入力: `mic_stream` や `flutter_sound` などのWeb対応パッケージを利用
-    -   音声出力: `audioplayers` などのWeb対応パッケージを利用
+    -   マイク入力/音声出力: `flutter_sound` パッケージを利用（Web対応）
+-   **UUID生成:** `uuid` パッケージを使用して、チャットセッションの `chat_id` を正規の UUID v4 形式で生成します。
 
 詳細なアーキテクチャやシーケンス図については、プロジェクトルートの [`AGENTS.md`](../AGENTS.md) を参照してください。
 

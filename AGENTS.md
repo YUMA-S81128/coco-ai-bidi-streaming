@@ -42,7 +42,8 @@
 ### 3.1. 補足: Cloud Run デプロイ要件と Vertex AI
 - **APP_NAME:** ADK の `Runner` 機能を使用する場合、アプリケーションを一意に識別する `APP_NAME` の定義が必須となる。
 - **ランタイム構成:** Cloud Run 上で FastAPI を動かし、WebSocket 接続を終端する (BFFパターン)。
-- **Vertex AI Agent Engine の利用:** エージェントのコード自体は Cloud Run に配置するが、**セッション履歴の管理 (Memory)** には `VertexAISessionService` を利用する。そのため、**Vertex AI Agent Engine のインスタンス作成**が必須となる（コードのデプロイは不要）。
+- **Vertex AI Agent Engine の利用:** エージェントのコード自体は Cloud Run に配置するが、**セッション履歴の管理 (Memory)** には `VertexAiSessionService` を利用する。そのため、**Vertex AI Agent Engine のインスタンス作成**が必須となる（コードのデプロイは不要）。
+  - **重要**: `VertexAiSessionService` は**カスタム session_id をサポートしない**ため、セッション ID は必ずサービスによって自動生成される。フロントエンドの `chat_id` とバックエンドの `session_id` は異なる値となり、Firestore (`chats.sessionId`) でマッピングを管理する。
 
 
 ## 4. 接続シーケンスとアーキテクチャ (Cloud Run BFF パターン)
@@ -136,9 +137,12 @@ Firebase Authentication で認証されたユーザーの情報を保持しま�
 /chats/{chat_id}
   - userId: string           // 所有者のID (users/{user_id}への参照)
   - title: string            // AIによって生成された会話の要約タイトル
+  - sessionId: string | null // ADK セッション ID（VertexAiSessionService が自動生成）
   - createdAt: timestamp     // 会話開始日時
   - updatedAt: timestamp     // 最終更新日時
 ```
+
+> **Note**: `chat_id` はフロントエンドで生成される UUID、`sessionId` は ADK (VertexAiSessionService) が自動生成する ID です。両者は異なる値であり、Firestore でマッピングを管理します。
 
 ### 3. `messages` サブコレクション
 
