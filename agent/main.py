@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from google.adk.runners import Runner
 
 from app.agent import agent
+from app.config import settings
 from app.routers import websocket
 from app.services.session_factory import get_session_service
 
@@ -24,7 +25,16 @@ except ValueError:
 app = FastAPI()
 
 # アプリケーション設定
-APP_NAME = "coco-ai-bidi-streaming"
+# VertexAiSessionService を使用する場合、app_name には Agent Engine ID を指定する
+# InMemorySessionService を使用する場合は任意の名前でよい
+APP_NAME = (
+    settings.vertex_ai_agent_engine_id
+    if settings.vertex_ai_agent_engine_id
+    and settings.session_type.lower() == "vertexai"
+    else "coco-ai-bidi-streaming"
+)
+
+logger.info(f"Using APP_NAME: {APP_NAME}")
 
 # ADK コンポーネントの初期化
 session_service = get_session_service(APP_NAME)
