@@ -53,11 +53,11 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: String.fromEnvironment('FIREBASE_API_KEY_WEB'),
-    appId: String.fromEnvironment('FIREBASE_APP_ID_WEB'),
-    messagingSenderId: String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID_WEB'),
-    projectId: String.fromEnvironment('FIREBASE_PROJECT_ID_WEB'),
-    authDomain: String.fromEnvironment('FIREBASE_AUTH_DOMAIN_WEB'),
-    storageBucket: String.fromEnvironment('FIREBASE_STORAGE_BUCKET_WEB'),
+    apiKey: String.fromEnvironment('FIREBASE_API_KEY'),
+    appId: String.fromEnvironment('FIREBASE_APP_ID'),
+    messagingSenderId: String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID'),
+    projectId: String.fromEnvironment('FIREBASE_PROJECT_ID'),
+    authDomain: String.fromEnvironment('FIREBASE_AUTH_DOMAIN'),
+    storageBucket: String.fromEnvironment('FIREBASE_STORAGE_BUCKET'),
   );
 }
