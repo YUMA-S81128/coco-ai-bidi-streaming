@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_sound/flutter_sound.dart';
+import 'package:uuid/uuid.dart';
 
 import '../data/chat_repository.dart';
 
@@ -306,17 +307,6 @@ class ChatNotifier extends Notifier<ChatState> {
 
   /// UUID v4 形式の文字列を生成する。
   String _generateUuid() {
-    final now = DateTime.now();
-    final random = now.microsecondsSinceEpoch.toRadixString(36);
-    final timestamp = now.millisecondsSinceEpoch.toRadixString(36);
-    return '$timestamp-$random-${_randomHex(4)}-${_randomHex(4)}-${_randomHex(12)}';
-  }
-
-  String _randomHex(int length) {
-    final buffer = StringBuffer();
-    for (var i = 0; i < length; i++) {
-      buffer.write((DateTime.now().microsecond % 16).toRadixString(16));
-    }
-    return buffer.toString();
+    return const Uuid().v4();
   }
 }
