@@ -3,25 +3,16 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     
-    // Helper function to check if the user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    // Helper function to check if the user is the owner of the path
+    // ユーザーが認証済みであり、かつ指定されたユーザーIDと一致するか確認する
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return request.auth != null && request.auth.uid == userId;
     }
 
-    // Deny access to the root by default
-    match /{allPaths=**} {
-      allow read, write: if false;
-    }
 
-    // Allow access to user-specific generated images directories
-    // Path structure: generated_images/{userId}/{filename}
+    // ユーザー固有の生成画像ディレクトリへのアクセスを許可する
+    // パス構成: generated_images/{userId}/{filename}
     match /generated_images/{userId}/{allPaths=**} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
     }
   }
 }
