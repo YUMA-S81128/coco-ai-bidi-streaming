@@ -52,7 +52,7 @@ steps:
       - -c
       - |
         if [[ "${_DEPLOY_TARGET}" == "all" || "${_DEPLOY_TARGET}" == "rules" ]]; then
-          firebase deploy --only firestore,storage --project=${PROJECT_ID}
+          firebase deploy --only firestore:rules,firestore:indexes,storage --project=${PROJECT_ID}
         fi
 
   # --- Step 3: Build Backend Image ---
