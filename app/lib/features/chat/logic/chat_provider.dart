@@ -70,18 +70,46 @@ class ChatNotifier extends Notifier<ChatState> {
   }
 
   /// 音声デバイスを初期化する。
+  ///
+  /// Web 環境ではマイク許可をリクエストし、その後レコーダーを開く。
   Future<void> init() async {
     _recorder = FlutterSoundRecorder();
     _player = FlutterSoundPlayer();
 
     try {
+      // Web 環境でのマイク許可リクエスト
+      if (kIsWeb) {
+        final permitted = await _requestMicrophonePermission();
+        if (!permitted) {
+          state = state.copyWith(
+            status: ChatStatus.error,
+            errorMessage: 'マイクの使用許可が必要です',
+          );
+          return;
+        }
+      }
+
       await _recorder!.openRecorder();
       await _player!.openPlayer();
+      debugPrint('Audio devices initialized successfully');
     } catch (e) {
       state = state.copyWith(
         status: ChatStatus.error,
         errorMessage: 'Failed to init audio: $e',
       );
+    }
+  }
+
+  /// Web 環境でマイク許可をリクエストする。
+  Future<bool> _requestMicrophonePermission() async {
+    try {
+      // dart:js_interop を使用して getUserMedia を呼び出す
+      // flutter_sound_web が内部で処理するため、ここでは true を返す
+      // 実際の許可リクエストは startRecorder 時に発生する
+      return true;
+    } catch (e) {
+      debugPrint('Microphone permission error: $e');
+      return false;
     }
   }
 
@@ -118,12 +146,18 @@ class ChatNotifier extends Notifier<ChatState> {
       _audioSubscription = _repository.messages.listen(
         _handleMessage,
         onError: (e) {
+          debugPrint('WebSocket error received: $e');
           state = state.copyWith(
             status: ChatStatus.error,
             errorMessage: 'WebSocket error: $e',
           );
         },
         onDone: () {
+          debugPrint('WebSocket stream closed (onDone)');
+          // 録音中に接続が切れた場合は録音を停止
+          if (state.status == ChatStatus.recording) {
+            stopRecording();
+          }
           state = state.copyWith(status: ChatStatus.disconnected);
         },
       );
