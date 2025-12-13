@@ -1,16 +1,15 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'firebase_options.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'features/auth/login_screen.dart';
-import 'features/chat/ui/chat_screen.dart';
+import 'features/chat/ui/chat_list_screen.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const ProviderScope(child: MyApp()));
 }
 
@@ -30,6 +29,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
+/// 認証状態に応じて画面を切り替えるラッパー。
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
@@ -38,12 +38,19 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
+        // ローディング中
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
+
+        // 認証済み → チャット一覧画面
         if (snapshot.hasData) {
-          return const ChatScreen();
+          return const ChatListScreen();
         }
+
+        // 未認証 → ログイン画面
         return const LoginScreen();
       },
     );

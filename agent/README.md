@@ -11,12 +11,14 @@ Python, FastAPI, ADK (Agent Development Kit) を用いて構築されており�
 
 -   **WebSocketサーバー:**
     -   FastAPIと`websockets`ライブラリを使用し、FlutterクライアントからのWebSocket接続を受け付けます。
-    -   接続パラメータ (`?token=...`) またはヘッダーから送られた Firebase ID トークンを検証し、認証を行います。
+    -   接続パラメータ (`?token=...&chat_id=...`) から送られた Firebase ID トークンを検証し、認証を行います。
 -   **リアルタイムストリーム中継:**
     -   クライアントから受信した音声チャンクを、ADKを介して**Gemini Live API**に転送します。
     -   Gemini Live APIから返却される応答音声チャンクを、リアルタイムでクライアントに転送します。
 -   **セッション管理:**
-    -   Vertex AI Agent Engine (VertexAISessionService) を利用して、会話履歴をクラウド上に永続化します。
+    -   Vertex AI Agent Engine (VertexAiSessionService) を利用して、会話履歴をクラウド上に永続化します。
+    -   `VertexAiSessionService` はカスタム session_id をサポートしないため、セッション ID は自動生成されます。
+    -   フロントエンドの `chat_id` とバックエンドの `session_id` のマッピングは Firestore (`chats.sessionId`) で管理します。
 -   **ツール実行:**
     -   会話の中でGeminiが特定のツール（例: 画像生成）を呼び出す判断をした場合、それを検知します。
     -   画像生成プロンプトを取得し、Firestoreの`image_jobs`コレクションに新しいジョブとして登録します。
@@ -43,7 +45,7 @@ uv venv
 
 # 仮想環境のアクティベート
 source .venv/bin/activate  # macOS/Linux
-.venv\Scripts\activate    # Windows
+.venv\\Scripts\\activate    # Windows
 
 # 依存関係のインストール (uv.lock から)
 uv sync
@@ -54,7 +56,7 @@ uv sync
 FastAPIの開発サーバーを起動します。
 
 ```bash
-uvicorn agent.main:app --reload
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### コーディング規約

@@ -40,7 +40,8 @@ steps:
             --dart-define="FIREBASE_MESSAGING_SENDER_ID=$${FIREBASE_MESSAGING_SENDER_ID}" \
             --dart-define="FIREBASE_PROJECT_ID=$${FIREBASE_PROJECT_ID}" \
             --dart-define="FIREBASE_STORAGE_BUCKET=$${FIREBASE_STORAGE_BUCKET}" \
-            --dart-define="FIREBASE_AUTH_DOMAIN=$${FIREBASE_AUTH_DOMAIN}"
+            --dart-define="FIREBASE_AUTH_DOMAIN=$${FIREBASE_AUTH_DOMAIN}" \
+            --dart-define="BACKEND_URL=${_BACKEND_URL}"
         fi
 
   # --- Step 2: Deploy Firebase Rules ---
@@ -51,7 +52,7 @@ steps:
       - -c
       - |
         if [[ "${_DEPLOY_TARGET}" == "all" || "${_DEPLOY_TARGET}" == "rules" ]]; then
-          firebase deploy --only firestore,storage --project=${PROJECT_ID}
+          firebase deploy --only firestore:rules,firestore:indexes,storage --project=${PROJECT_ID}
         fi
 
   # --- Step 3: Build Backend Image ---
@@ -116,3 +117,4 @@ substitutions:
   _ARTIFACT_REGISTRY_REPO: "coco-ai-bidi-streaming"
   _SESSION_TYPE: "vertexai"
   _VERTEX_AI_AGENT_ENGINE_ID: ""
+  _BACKEND_URL: ""
