@@ -1,11 +1,131 @@
 # coco-ai-bidi-streaming
 
+Flutter (Web) と Python (FastAPI, ADK) を用いた、リアルタイムの音声ストリーミング対話と、会話コンテキストに応じた画像生成が可能な Web アプリケーションです。
+
 ## ディレクトリ構成
 
-このプロジェクトは、以下のディレクトリで構成されています。
+- `./app`: Flutter (Web) フロントエンドクライアント。UI、マイク入力、音声再生などを担当。
+- `./agent`: Python (FastAPI, ADK) バックエンドエージェント。WebSocket接続管理とGemini Live APIとの音声ストリーム中継を担当。
 
--   `./app`: Flutter (Web) で構築されたフロントエンドクライアントアプリケーション。UI、マイク入力、音声再生などを担当します。
--   `./agent`: Python (FastAPI, ADK) で構築されたコアバックエンドエージェント。WebSocket接続を管理し、Gemini Live APIとの音声ストリーム中継やビジネスロジックを担当します。
+## アーキテクチャ
+
+### 概要
+
+| コンポーネント | 技術 |
+|---------------|------|
+| クライアント | Flutter (Web) |
+| 認証 | Firebase Authentication |
+| バックエンド (BFF) | Cloud Run (FastAPI + ADK Runner) |
+| リアルタイム通信 | WebSocket |
+| AI モデル | Gemini Live API (双方向ストリーミング) |
+| データベース | Cloud Firestore |
+| セッション管理 | Vertex AI Agent Engine (VertexAiSessionService) |
+| ストレージ | Cloud Storage for Firebase |
+
+### Cloud Run BFF パターン
+
+Flutterアプリと Vertex AI Agent Engine の接続には、Cloud Run 上の FastAPI を WebSocket 中継サーバー (BFF: Backend For Frontend) として利用します。認証には Firebase Authentication の ID トークンを直接利用し、シンプルかつ堅牢なセキュリティを実現します。
+
+```mermaid
+sequenceDiagram
+    participant App as Flutter App
+    participant Auth as Firebase Auth
+    participant BFF as Cloud Run (FastAPI)
+    participant Vertex as Vertex AI
+
+    App->>Auth: IDトークン取得
+    App->>BFF: WebSocket接続 (wss://...?token=JWT)
+    BFF->>BFF: IDトークン検証 (Firebase Admin)
+    
+    alt 無効なトークン
+        BFF-->>App: 切断 (Close 1008)
+    else 有効なトークン
+        BFF->>Vertex: セッション確立
+        BFF-->>App: 接続確立 (Open)
+        
+        loop 双方向ストリーミング
+            App->>BFF: 音声送信
+            BFF->>Vertex: 転送
+            Vertex-->>BFF: 音声返信
+            BFF-->>App: 転送
+        end
+    end
+```
+
+### Vertex AI Agent Engine
+
+- エージェントのコードは Cloud Run に配置
+- **セッション履歴の管理 (Memory)** には `VertexAiSessionService` を利用
+- `VertexAiSessionService` は**カスタム session_id をサポートしない**ため、セッション ID は自動生成される
+- フロントエンドの `chat_id` とバックエンドの `session_id` は異なる値となり、Firestore (`chats.sessionId`) でマッピングを管理
+
+## データモデル (Firestore)
+
+### 1. `users` コレクション
+
+```
+/users/{user_id}
+  - displayName: string      // 表示名
+  - createdAt: timestamp     // アカウント作成日時
+```
+
+### 2. `chats` コレクション
+
+```
+/chats/{chat_id}
+  - userId: string           // 所有者のID
+  - title: string            // AIによって生成された会話の要約タイトル
+  - sessionId: string | null // ADK セッション ID（自動生成）
+  - createdAt: timestamp     // 会話開始日時
+  - updatedAt: timestamp     // 最終更新日時
+```
+
+> **Note**: `chat_id` はフロントエンドで生成される UUID、`sessionId` は ADK が自動生成する ID です。
+
+### 3. `messages` サブコレクション
+
+```
+/chats/{chat_id}/messages/{message_id}
+  - role: string             // "user" | "model" | "tool"
+  - content: string          // メッセージ内容
+  - toolCalls: array | null  // モデルが呼び出したツールの情報
+    - toolName: string
+    - jobId: string          // image_jobs/{job_id}への参照
+  - createdAt: timestamp     // 送信日時
+```
+
+### 4. `image_jobs` コレクション
+
+```
+/image_jobs/{job_id}
+  - userId: string           // ジョブを開始したユーザー
+  - chatId: string           // 関連する会話
+  - messageId: string        // 関連するメッセージ
+  - prompt: string           // 画像生成に使用されたプロンプト
+  - status: string           // "pending" | "processing" | "completed" | "failed"
+  - imageUrl: string | null  // 生成が完了した画像のURL
+  - error: string | null     // 失敗した場合のエラーメッセージ
+  - createdAt: timestamp     // ジョブ作成日時
+  - updatedAt: timestamp     // ジョブ状態の最終更新日時
+```
+
+## 画像生成フロー
+
+1. **[Gemini Live]** 会話の中で、Gemini が画像生成が必要と判断
+2. **[ADK Agent]** 画像生成ツールコールを検知し、プロンプトを取得
+3. **[ADK Agent]** Firestore の `image_jobs` に新しいドキュメントを作成 (`status: "pending"`)
+4. **[Flutter]** Firestore を `snapshots()` でリアルタイム監視、ジョブを検知しインジケーターを表示
+5. **[Backend]** 画像生成 API を呼び出し、Cloud Storage にアップロード
+6. **[Backend]** `image_jobs` を更新 (`status: "completed"`, `imageUrl` を設定)
+7. **[Flutter]** ステータス変更を検知し、生成画像を表示
+
+## 参考情報
+
+- [ADK Bidi-streaming (live) Overview](https://google.github.io/adk-docs/streaming/) - 双方向ストリーミング機能の全体像
+- [Streaming Quickstart](https://google.github.io/adk-docs/get-started/streaming/quickstart-streaming/) - 公式クイックスタートガイド
+- [Custom Streaming with WebSocket](https://google.github.io/adk-docs/streaming/custom-streaming-ws/) - カスタム WebSocket 実装ガイド
+
+---
 
 ## Cloud Shell でのセットアップ手順
 
