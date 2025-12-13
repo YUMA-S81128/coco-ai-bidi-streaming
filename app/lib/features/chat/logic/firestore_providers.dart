@@ -2,76 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// チャットセッションのモデル。
-class Chat {
-  final String id;
-  final String userId;
-  final String title;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
+import '../../../models/chat.dart';
+import '../../../models/image_job.dart';
 
-  const Chat({
-    required this.id,
-    required this.userId,
-    required this.title,
-    this.createdAt,
-    this.updatedAt,
-  });
-
-  factory Chat.fromDocument(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    return Chat(
-      id: doc.id,
-      userId: data['userId'] as String? ?? '',
-      title: data['title'] as String? ?? '',
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
-    );
-  }
-}
-
-/// 画像生成ジョブのモデル。
-class ImageJob {
-  final String id;
-  final String userId;
-  final String chatId;
-  final String? messageId;
-  final String prompt;
-  final String status;
-  final String? imageUrl;
-  final String? error;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
-
-  const ImageJob({
-    required this.id,
-    required this.userId,
-    required this.chatId,
-    this.messageId,
-    required this.prompt,
-    required this.status,
-    this.imageUrl,
-    this.error,
-    this.createdAt,
-    this.updatedAt,
-  });
-
-  factory ImageJob.fromDocument(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    return ImageJob(
-      id: doc.id,
-      userId: data['userId'] as String? ?? '',
-      chatId: data['chatId'] as String? ?? '',
-      messageId: data['messageId'] as String?,
-      prompt: data['prompt'] as String? ?? '',
-      status: data['status'] as String? ?? 'pending',
-      imageUrl: data['imageUrl'] as String?,
-      error: data['error'] as String?,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
-    );
-  }
-}
+export '../../../models/chat.dart';
+export '../../../models/image_job.dart';
 
 /// 現在の認証ユーザー ID を提供するプロバイダー。
 final currentUserIdProvider = Provider<String?>((ref) {
