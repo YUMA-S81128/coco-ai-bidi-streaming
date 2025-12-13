@@ -225,9 +225,15 @@ async def generate_image(
 
         # 3. Upload to GCS
         filename = f"{job_id}.png"
+        upload_path = (
+            f"generated_images/{user_id}/{filename}"
+            if user_id
+            else f"generated_images/unknown_user/{filename}"
+        )
+
         image_url = await upload_blob_from_memory(
             settings.gcs_bucket_name,
-            f"generated_images/{filename}",
+            upload_path,
             generated_image_bytes,
             "image/png",
         )

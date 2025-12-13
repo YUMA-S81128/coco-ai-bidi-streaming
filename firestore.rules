@@ -1,18 +1,30 @@
-rules_version='2'
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2025, 12, 16);
+
+    // ユーザーが認証済みであり、かつ指定されたユーザーIDと一致するか確認する
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // chats コレクション
+    match /chats/{chatId} {
+      // 読み取り: 既存ドキュメントの所有者であればアクセス可能
+      allow read: if isOwner(resource.data.userId);
+      
+      // messages サブコレクション
+      match /messages/{messageId} {
+        // 読み取り: 親の chat ドキュメントの所有者であれば許可
+        // get() を使用して親の chat ドキュメントを取得
+        allow read: if isOwner(get(/databases/$(database)/documents/chats/$(chatId)).data.userId);
+      }
+    }
+
+    // image_jobs コレクション
+    match /image_jobs/{jobId} {
+      // 読み取り: 既存ドキュメントの所有者であればアクセス可能
+      allow read: if isOwner(resource.data.userId);
     }
   }
 }
