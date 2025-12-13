@@ -115,11 +115,12 @@ async def websocket_endpoint(
     live_request_queue = LiveRequestQueue()
 
     # レスポンスモードの設定
-    response_modalities = ["AUDIO"]
+    # types.Modality enum を使用
+    response_modalities = [types.Modality.AUDIO]
     output_audio_transcription = types.AudioTranscriptionConfig()
 
     if response_mode and response_mode.lower() == "text":
-        response_modalities = ["TEXT"]
+        response_modalities = [types.Modality.TEXT]
         output_audio_transcription = None
 
     # RunConfig の設定
