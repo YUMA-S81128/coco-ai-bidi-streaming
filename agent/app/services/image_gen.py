@@ -7,7 +7,7 @@ import uuid
 
 import requests
 from google import genai
-from google.cloud import firestore, storage
+from google.cloud import storage
 from google.genai import types
 from tenacity import (
     before_sleep_log,
@@ -19,15 +19,12 @@ from tenacity import (
 from urllib3.exceptions import SSLError as UrllibSSLError
 
 from app.config import settings
+from app.services.firestore_service import (
+    create_image_job,
+    update_image_job_status,
+)
 
 logger = logging.getLogger(__name__)
-
-# Firestore クライアントの初期化
-try:
-    db = firestore.AsyncClient()
-except Exception as e:
-    logger.warning(f"Firestore initialize failed: {e}")
-    db = None
 
 # GCS クライアントの初期化
 storage_client = storage.Client()
@@ -97,46 +94,6 @@ async def upload_blob_from_memory(
     return gcs_path
 
 
-# --- Firestore ヘルパー関数 ---
-async def _update_job(db: firestore.AsyncClient, job_id: str, payload: dict) -> None:
-    """
-    Firestore のジョブドキュメントを更新する内部ヘルパー関数。
-
-    Args:
-        db: Firestore の非同期クライアント。
-        job_id: 更新対象のジョブ ID。
-        payload: 更新するデータ。
-    """
-    logger.info(f"[{job_id}] Updating job... Payload: {payload}")
-    payload["updatedAt"] = firestore.SERVER_TIMESTAMP
-    job_ref = db.collection(settings.image_jobs_collection).document(job_id)
-
-    try:
-        await job_ref.set(payload, merge=True)
-        logger.info(f"[{job_id}] Job updated.")
-    except Exception as e:
-        logger.error(f"[{job_id}] Error updating job: {e}", exc_info=True)
-        raise
-
-
-async def update_job_status(
-    db: firestore.AsyncClient, job_id: str, status: str, data: dict | None = None
-) -> None:
-    """
-    ジョブのステータスとオプションデータを更新する。
-
-    Args:
-        db: Firestore の非同期クライアント。
-        job_id: 更新対象のジョブ ID。
-        status: 新しいステータス文字列。
-        data: 追加で更新するデータ (オプション)。
-    """
-    update_payload = {"status": status}
-    if data:
-        update_payload.update(data)
-    await _update_job(db, job_id, update_payload)
-
-
 # --- 画像生成 API ---
 async def generate_image(
     prompt: str,
@@ -166,34 +123,18 @@ async def generate_image(
         f"user_id={user_id}, chat_id={chat_id}, message_id={message_id}"
     )
 
-    if db is None:
-        return "Error: Firestore not initialized."
-
     if not settings.gcs_bucket_name:
         logger.error("GCS_BUCKET_NAME is not set.")
         return "Error: Server configuration error (GCS bucket not set)."
 
     # 1. ジョブの作成 (pending 状態)
-    try:
-        job_ref = db.collection(settings.image_jobs_collection).document()
-        job_id = job_ref.id
-        job_data = {
-            "prompt": prompt,
-            "status": "pending",
-            "createdAt": firestore.SERVER_TIMESTAMP,
-            "userId": user_id,
-            "chatId": chat_id,
-            "messageId": message_id,
-        }
-        await job_ref.set(job_data)
-        logger.info(f"Created job: {job_id}")
-    except Exception as e:
-        logger.error(f"Failed to create job: {e}")
-        return f"Error creating image job: {e}"
+    job_id = await create_image_job(prompt, user_id, chat_id, message_id)
+    if not job_id:
+        return "Error: Failed to create image job."
 
     # 2. Run Generation
     try:
-        await update_job_status(db, job_id, "processing")
+        await update_image_job_status(job_id, "processing")
 
         client = genai.Client(
             vertexai=True,
@@ -239,10 +180,10 @@ async def generate_image(
         )
 
         # 4. Complete
-        await update_job_status(db, job_id, "completed", {"imageUrl": image_url})
+        await update_image_job_status(job_id, "completed", {"imageUrl": image_url})
         return f"画像生成ジョブを開始しました。ID: {job_id}"
 
     except Exception as e:
         logger.error(f"Error during image generation: {e}", exc_info=True)
-        await update_job_status(db, job_id, "failed", {"error": str(e)})
+        await update_image_job_status(job_id, "failed", {"error": str(e)})
         return f"Image generation failed: {e}"

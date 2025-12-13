@@ -4,6 +4,7 @@ import logging
 
 from google.adk.tools import ToolContext
 
+from app.services.firestore_service import update_chat_title
 from app.services.image_gen import generate_image
 
 logger = logging.getLogger(__name__)
@@ -49,3 +50,33 @@ async def generate_image_tool(
     # message_id は image_gen.py で自動生成される
 
     return await generate_image(prompt, user_id, chat_id)
+
+
+async def set_chat_title_tool(
+    title: str,
+    tool_context: ToolContext,
+) -> str:
+    """
+    会話のタイトルを設定する。
+
+    新しいチャットが開始されたとき、会話の内容に基づいて適切なタイトルを設定する。
+    タイトルは簡潔で会話の主題を表すものにすること。
+
+    Args:
+        title: 設定するタイトル（例：「ライオンの絵について」「天気の相談」）。
+        tool_context: ADK ツールコンテキスト。
+
+    Returns:
+        処理結果のメッセージ。
+    """
+    chat_id = tool_context.state.get("chat_id")
+    logger.info(f"set_chat_title_tool called: chat_id={chat_id}, title={title}")
+
+    if not chat_id:
+        return "エラー: チャットIDが見つかりませんでした。"
+
+    success = await update_chat_title(chat_id, title)
+    if success:
+        return f"タイトルを「{title}」に設定しました。"
+    else:
+        return "タイトルの設定に失敗しました。"
