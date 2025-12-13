@@ -7,6 +7,11 @@ from google.adk.agents.live_request_queue import LiveRequestQueue
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.genai import types
 
+from app.services.firestore_service import (
+    ensure_chat_exists,
+    ensure_user_exists,
+    save_message,
+)
 from app.tools import SessionFinishedException
 
 router = APIRouter()
@@ -58,6 +63,10 @@ async def websocket_endpoint(
         f"WebSocket 接続確立: user_id={user_id}, chat_id={chat_id}, mode={response_mode}"  # noqa: E501
     )
 
+    # Firestore にユーザーとチャットを作成（存在しない場合）
+    await ensure_user_exists(user_id)
+    is_new_chat = await ensure_chat_exists(user_id, chat_id)
+
     # main.py で設定された Runner と SessionService を取得
     runner = websocket.app.state.runner
     session_service = websocket.app.state.session_service
@@ -76,7 +85,11 @@ async def websocket_endpoint(
             app_name=app_name,
             user_id=user_id,
             session_id=session_id,
-            state={"user_id": user_id, "chat_id": chat_id},
+            state={
+                "user_id": user_id,
+                "chat_id": chat_id,
+                "is_new_chat": is_new_chat,
+            },
         )
 
     # LiveRequestQueue の作成
@@ -133,6 +146,7 @@ async def websocket_endpoint(
     async def downstream_task():
         """
         Runner からのイベントを受信し、WebSocket に送信します。
+        文字起こしが完了したイベントを Firestore に保存します。
         """
         try:
             async for event in runner.run_live(
@@ -145,6 +159,9 @@ async def websocket_endpoint(
                 # exclude_none=True でデータ量を削減
                 event_json = event.model_dump_json(exclude_none=True, by_alias=True)
                 await websocket.send_text(event_json)
+
+                # 文字起こし完了イベントを Firestore に保存
+                await _save_transcription_if_finished(event, chat_id)
 
         except Exception as e:
             logger.error(f"Downstream エラー: {e}")
@@ -164,3 +181,28 @@ async def websocket_endpoint(
             await websocket.close()
         except Exception:
             pass
+
+
+async def _save_transcription_if_finished(event, chat_id: str) -> None:
+    """
+    イベントから完了した文字起こしを検出し Firestore に保存する。
+
+    Args:
+        event: ADK イベントオブジェクト。
+        chat_id: チャットセッションの ID。
+    """
+    # ユーザーの入力文字起こし (input_transcription)
+    input_transcription = getattr(event, "input_transcription", None)
+    if input_transcription and getattr(input_transcription, "finished", False):
+        text = getattr(input_transcription, "text", "")
+        if text:
+            await save_message(chat_id, "user", text)
+            logger.debug(f"Saved user message: {text[:50]}...")
+
+    # モデルの出力文字起こし (output_transcription)
+    output_transcription = getattr(event, "output_transcription", None)
+    if output_transcription and getattr(output_transcription, "finished", False):
+        text = getattr(output_transcription, "text", "")
+        if text:
+            await save_message(chat_id, "model", text)
+            logger.debug(f"Saved model message: {text[:50]}...")
