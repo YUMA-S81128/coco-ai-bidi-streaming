@@ -3,45 +3,28 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if the user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    // Helper function to check if the user is the owner of the document
+    // ユーザーが認証済みであり、かつ指定されたユーザーIDと一致するか確認する
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return request.auth != null && request.auth.uid == userId;
     }
 
-    // users collection
-    // Only the user themselves can read or write their own user document.
-    match /users/{userId} {
-      allow read, write: if isOwner(userId);
-    }
-
-    // chats collection
+    // chats コレクション
     match /chats/{chatId} {
-      // Create: User can create a chat if they own it.
-      allow create: if isOwner(request.resource.data.userId);
-      // Read, Update, Delete: User can access if they are the owner of the existing document.
-      allow read, update, delete: if isOwner(resource.data.userId);
+      // 読み取り: 既存ドキュメントの所有者であればアクセス可能
+      allow read: if isOwner(resource.data.userId);
       
-      // messages subcollection
+      // messages サブコレクション
       match /messages/{messageId} {
-        // Read, Write: Allow if the user owns the parent chat document.
-        // using get() to fetch the parent chat document.
-        allow read, write: if isOwner(get(/databases/$(database)/documents/chats/$(chatId)).data.userId);
+        // 読み取り: 親の chat ドキュメントの所有者であれば許可
+        // get() を使用して親の chat ドキュメントを取得
+        allow read: if isOwner(get(/databases/$(database)/documents/chats/$(chatId)).data.userId);
       }
     }
 
-    // image_jobs collection
+    // image_jobs コレクション
     match /image_jobs/{jobId} {
-      // Create: User can create a job if they ownership in the data matches their auth uid.
-      allow create: if isOwner(request.resource.data.userId);
-      // Read, Update: User can access if they own the existing document.
-      allow read, update: if isOwner(resource.data.userId);
-      // Delete: Optional, but usually good to allow owner to cleanup.
-      allow delete: if isOwner(resource.data.userId);
+      // 読み取り: 既存ドキュメントの所有者であればアクセス可能
+      allow read: if isOwner(resource.data.userId);
     }
   }
 }
