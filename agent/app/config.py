@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     # Model Settings
     ## Bidi-Streaming
     model_id: str = Field(
-        default="gemini-live-2.5-flash-preview-native-audio-09-2025",
+        default="gemini-live-2.5-flash-native-audio",
         description="Bidi-Streaming用のモデルID",
     )
     ## Image Generation
