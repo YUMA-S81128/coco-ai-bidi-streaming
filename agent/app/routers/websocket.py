@@ -101,10 +101,11 @@ async def websocket_endpoint(
                 "is_new_chat": is_new_chat,
             },
         )
-        # 自動生成された session_id を Firestore に保存
+        # 自動生成された session_id を Firestore に保存し、変数も更新
         if session and session.id:
-            await set_session_id_for_chat(chat_id, session.id)
-            logger.info(f"Created new session: {session.id} for chat: {chat_id}")
+            session_id = session.id  # 変数を更新
+            await set_session_id_for_chat(chat_id, session_id)
+            logger.info(f"Created new session: {session_id} for chat: {chat_id}")
         else:
             logger.error("Failed to create session")
             await websocket.close(code=1011, reason="Failed to create session")
@@ -141,11 +142,9 @@ async def websocket_endpoint(
                 if "bytes" in message:
                     # 音声データ (bytes)
                     data = message["bytes"]
-                    # ADK は bytes を直接受け取れるか、
-                    # Content オブジェクトにラップするか
-                    # LiveRequestQueue.send_realtime は bytes を受け取る
-                    # mime_type は audio/pcm;rate=16000 などを想定
-                    live_request_queue.send_realtime(data, mime_type="audio/pcm")
+                    # ADK は types.Blob でラップする必要がある
+                    blob = types.Blob(data=data, mime_type="audio/pcm")
+                    live_request_queue.send_realtime(blob)
 
                 elif "text" in message:
                     # テキストメッセージ
