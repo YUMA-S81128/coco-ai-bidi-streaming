@@ -74,10 +74,30 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
+  /// ページロード時に初期化とWebSocket接続を同時に開始する。
+  ///
+  /// ユーザーにはマイクボタン1タップで会話開始できる状態を提供する。
+  /// [chatId] が指定されない場合は新規chatIdを生成する。
+  Future<void> initAndConnect({String? chatId}) async {
+    await init();
+    final targetChatId = chatId ?? _generateUuid();
+    await _connectToChat(targetChatId);
+  }
+
+  /// チャットを切り替える。
+  ///
+  /// 既存の接続を切断し、新しいchatIdで再接続する。
+  Future<void> switchChat(String chatId) async {
+    if (state.chatId == chatId) return;
+    disconnect();
+    await _connectToChat(chatId);
+  }
+
   /// 新しいチャットセッションを開始する。
   ///
   /// UUID ベースの新規 chatId を生成し接続する。
   Future<void> startNewChat() async {
+    disconnect();
     // UUID v4 形式の chatId を生成
     final chatId = _generateUuid();
     await _connectToChat(chatId);

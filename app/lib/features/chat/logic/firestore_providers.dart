@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/chat.dart';
 import '../../../models/image_job.dart';
+import '../../../models/message.dart';
 
 export '../../../models/chat.dart';
 export '../../../models/image_job.dart';
+export '../../../models/message.dart';
 
 /// 現在の認証ユーザー ID を提供するプロバイダー。
 final currentUserIdProvider = Provider<String?>((ref) {
@@ -26,6 +28,22 @@ final chatsProvider = StreamProvider<List<Chat>>((ref) {
       .orderBy('updatedAt', descending: true)
       .snapshots()
       .map((snapshot) => snapshot.docs.map(Chat.fromDocument).toList());
+});
+
+/// 特定チャットのメッセージを監視するプロバイダー。
+///
+/// [chatId] に関連するメッセージを作成日時の昇順で返す。
+final messagesProvider = StreamProvider.family<List<Message>, String>((
+  ref,
+  chatId,
+) {
+  return FirebaseFirestore.instance
+      .collection('chats')
+      .doc(chatId)
+      .collection('messages')
+      .orderBy('createdAt', descending: false)
+      .snapshots()
+      .map((snapshot) => snapshot.docs.map(Message.fromDocument).toList());
 });
 
 /// 特定チャットの画像ジョブを監視するプロバイダー。

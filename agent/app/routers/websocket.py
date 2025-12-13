@@ -144,7 +144,8 @@ async def websocket_endpoint(
                     # 音声データ (bytes)
                     data = message["bytes"]
                     # ADK は types.Blob でラップする必要がある
-                    blob = types.Blob(data=data, mime_type="audio/pcm")
+                    # サンプルレートを含めないと policy violation エラーが発生する
+                    blob = types.Blob(data=data, mime_type="audio/pcm;rate=16000")
                     live_request_queue.send_realtime(blob)
 
                 elif "text" in message:
