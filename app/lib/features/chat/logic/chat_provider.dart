@@ -6,54 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../models/chat_state.dart';
 import '../data/chat_repository.dart';
+
+export '../../../models/chat_state.dart';
 
 final chatProvider = NotifierProvider<ChatNotifier, ChatState>(
   ChatNotifier.new,
 );
-
-/// チャットセッションの接続状態。
-enum ChatStatus {
-  /// 未接続（初期状態または切断後）
-  disconnected,
-
-  /// 接続処理中
-  connecting,
-
-  /// 接続完了（録音待機中）
-  connected,
-
-  /// 録音中
-  recording,
-
-  /// エラー発生
-  error,
-}
-
-/// チャットセッションの状態。
-class ChatState {
-  final ChatStatus status;
-  final String? chatId;
-  final String? errorMessage;
-
-  const ChatState({
-    this.status = ChatStatus.disconnected,
-    this.chatId,
-    this.errorMessage,
-  });
-
-  ChatState copyWith({
-    ChatStatus? status,
-    String? chatId,
-    String? errorMessage,
-  }) {
-    return ChatState(
-      status: status ?? this.status,
-      chatId: chatId ?? this.chatId,
-      errorMessage: errorMessage,
-    );
-  }
-}
 
 /// チャットセッションを管理する Notifier。
 class ChatNotifier extends Notifier<ChatState> {
