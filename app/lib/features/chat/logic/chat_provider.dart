@@ -224,6 +224,18 @@ class ChatNotifier extends Notifier<ChatState> {
   Future<void> startRecording() async {
     if (state.status != ChatStatus.connected) return;
 
+    // レコーダーが未初期化の場合は初期化
+    if (_recorder == null) {
+      await init();
+      if (_recorder == null) {
+        state = state.copyWith(
+          status: ChatStatus.error,
+          errorMessage: 'マイクの初期化に失敗しました',
+        );
+        return;
+      }
+    }
+
     try {
       state = state.copyWith(status: ChatStatus.recording);
 
@@ -244,10 +256,6 @@ class ChatNotifier extends Notifier<ChatState> {
         numChannels: 1,
         sampleRate: _targetSampleRate,
         bufferSize: 8192,
-      );
-
-      debugPrint(
-        'Recording started - Resampling: $_webInputSampleRate Hz -> $_targetSampleRate Hz',
       );
     } catch (e) {
       state = state.copyWith(
