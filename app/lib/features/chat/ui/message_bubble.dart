@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../config/app_theme.dart';
+import '../../../services/storage_service.dart';
 import '../logic/firestore_providers.dart';
 
 /// メッセージバブルウィジェット。
 ///
 /// ユーザーとモデルのメッセージを区別して表示し、
 /// 画像生成ジョブがある場合は画像も表示する。
-class MessageBubble extends StatelessWidget {
+class MessageBubble extends ConsumerWidget {
   final Message message;
   final ImageJob? imageJob;
 
   const MessageBubble({super.key, required this.message, this.imageJob});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isUser = message.role == 'user';
 
     return Padding(
@@ -56,13 +58,13 @@ class MessageBubble extends StatelessWidget {
           ),
 
           // 画像生成セクション（存在する場合のみ）
-          if (imageJob != null) _buildImageSection(context, imageJob!),
+          if (imageJob != null) _buildImageSection(context, ref, imageJob!),
         ],
       ),
     );
   }
 
-  Widget _buildImageSection(BuildContext context, ImageJob job) {
+  Widget _buildImageSection(BuildContext context, WidgetRef ref, ImageJob job) {
     final status = job.status;
 
     // 生成中
@@ -95,38 +97,48 @@ class MessageBubble extends StatelessWidget {
       );
     }
 
-    // 完了
+    // 完了 - imageUrlProvider で gs:// → https:// に変換
     if (status == 'completed' && job.imageUrl != null) {
+      final imageUrlAsync = ref.watch(imageUrlProvider(job.imageUrl!));
+
       return Container(
         margin: const EdgeInsets.only(top: 8),
         constraints: const BoxConstraints(maxWidth: 300),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            job.imageUrl!,
-            fit: BoxFit.cover,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Container(
-                height: 200,
-                color: Colors.grey[200],
-                child: Center(
-                  child: CircularProgressIndicator(
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                        : null,
-                  ),
-                ),
+          child: imageUrlAsync.when(
+            data: (url) {
+              if (url.isEmpty) {
+                return _buildErrorContainer();
+              }
+              return Image.network(
+                url,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Container(
+                    height: 200,
+                    color: Colors.grey[200],
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                            : null,
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) =>
+                    _buildErrorContainer(),
               );
             },
-            errorBuilder: (context, error, stackTrace) => Container(
-              height: 100,
+            loading: () => Container(
+              height: 200,
               color: Colors.grey[200],
-              child: const Center(
-                child: Icon(Icons.broken_image, color: Colors.grey),
-              ),
+              child: const Center(child: CircularProgressIndicator()),
             ),
+            error: (_, __) => _buildErrorContainer(),
           ),
         ),
       );
@@ -156,5 +168,13 @@ class MessageBubble extends StatelessWidget {
     }
 
     return const SizedBox.shrink();
+  }
+
+  Widget _buildErrorContainer() {
+    return Container(
+      height: 100,
+      color: Colors.grey[200],
+      child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+    );
   }
 }
