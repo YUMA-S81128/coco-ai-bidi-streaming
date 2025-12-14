@@ -35,7 +35,7 @@ class ChatArea extends ConsumerWidget {
           onTap: () => _handleMicTap(ref, chatState),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
       ],
     );
   }
@@ -114,50 +114,51 @@ class _MicrophoneControl extends StatelessWidget {
     final isConnecting = status == ChatStatus.connecting;
 
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           // マイクボタン
           GestureDetector(
             onTap: isConnecting ? null : onTap,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: 80,
-              height: 80,
+              width: 64,
+              height: 64,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _getButtonColor(),
                 boxShadow: [
                   BoxShadow(
                     color: _getButtonColor().withValues(alpha: 0.3),
-                    blurRadius: isRecording ? 20 : 10,
-                    spreadRadius: isRecording ? 4 : 2,
+                    blurRadius: isRecording ? 16 : 8,
+                    spreadRadius: isRecording ? 3 : 1,
                   ),
                 ],
               ),
               child: isConnecting
                   ? const Center(
                       child: SizedBox(
-                        width: 32,
-                        height: 32,
+                        width: 24,
+                        height: 24,
                         child: CircularProgressIndicator(
                           color: Colors.white,
-                          strokeWidth: 3,
+                          strokeWidth: 2,
                         ),
                       ),
                     )
                   : Icon(
                       isRecording ? Icons.stop : Icons.mic,
                       color: Colors.white,
-                      size: 36,
+                      size: 28,
                     ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           // ステータステキスト
           Text(
             _getStatusText(),
-            style: TextStyle(color: _getStatusTextColor(), fontSize: 14),
+            style: TextStyle(color: _getStatusTextColor(), fontSize: 12),
           ),
         ],
       ),

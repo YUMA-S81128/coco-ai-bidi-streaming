@@ -28,20 +28,37 @@ class MessageList extends ConsumerWidget {
           return _buildWelcomeView(context);
         }
 
-        final imageJobs = imageJobsAsync.when(
-          data: (jobs) => jobs,
-          loading: () => <ImageJob>[],
-          error: (_, __) => <ImageJob>[],
+        // 最新の画像ジョブのみ取得（createdAt降順で最初の1件）
+        final latestImageJob = imageJobsAsync.when(
+          data: (jobs) => jobs.isNotEmpty ? jobs.first : null,
+          loading: () => null,
+          error: (_, __) => null,
         );
+
+        // 画像ジョブの状態をデバッグ出力
+        if (latestImageJob != null) {
+          debugPrint(
+            'Latest image job: ${latestImageJob.id}, '
+            'status=${latestImageJob.status}, '
+            'imageUrl=${latestImageJob.imageUrl}',
+          );
+        }
+
+        // メッセージ + 最新画像ジョブ（存在する場合）
+        final hasImage = latestImageJob != null;
 
         return ListView.builder(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          itemCount: messages.length,
+          itemCount: messages.length + (hasImage ? 1 : 0),
           itemBuilder: (context, index) {
-            final message = messages[index];
-            final imageJob = _findImageJobForMessage(message, imageJobs);
+            // メッセージを先に表示
+            if (index < messages.length) {
+              final message = messages[index];
+              return MessageBubble(message: message);
+            }
 
-            return MessageBubble(message: message, imageJob: imageJob);
+            // 最新の画像ジョブを最後に表示
+            return _buildImageJobCard(context, latestImageJob!);
           },
         );
       },
@@ -59,23 +76,35 @@ class MessageList extends ConsumerWidget {
     );
   }
 
+  /// 画像ジョブをカードとして表示する。
+  Widget _buildImageJobCard(BuildContext context, ImageJob job) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      // 画像部分を MessageBubble に委譲（プロンプトは非表示）
+      child: MessageBubble(
+        message: Message(id: job.id, role: 'model', content: ''),
+        imageJob: job,
+      ),
+    );
+  }
+
   Widget _buildWelcomeView(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.mic, size: 64, color: AppColors.primary),
+            child: Icon(Icons.mic, size: 48, color: AppColors.primary),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           Text(
-            'Gemini Liveへようこそ',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            'Coco-Ai へようこそ',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
             ),
@@ -90,22 +119,5 @@ class MessageList extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  /// メッセージに関連する画像ジョブを検索する。
-  ImageJob? _findImageJobForMessage(Message message, List<ImageJob> imageJobs) {
-    // message.toolCalls から関連する画像ジョブを検索
-    final toolCalls = message.toolCalls;
-    if (toolCalls == null || toolCalls.isEmpty) return null;
-
-    for (final toolCall in toolCalls) {
-      if (toolCall.jobId != null) {
-        final job = imageJobs.where((j) => j.id == toolCall.jobId).firstOrNull;
-        if (job != null) return job;
-      }
-    }
-
-    // messageId でマッチングを試みる
-    return imageJobs.where((j) => j.messageId == message.id).firstOrNull;
   }
 }
