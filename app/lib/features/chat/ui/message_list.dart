@@ -35,15 +35,6 @@ class MessageList extends ConsumerWidget {
           error: (_, __) => null,
         );
 
-        // 画像ジョブの状態をデバッグ出力
-        if (latestImageJob != null) {
-          debugPrint(
-            'Latest image job: ${latestImageJob.id}, '
-            'status=${latestImageJob.status}, '
-            'imageUrl=${latestImageJob.imageUrl}',
-          );
-        }
-
         // メッセージ + 最新画像ジョブ（存在する場合）
         final hasImage = latestImageJob != null;
 
