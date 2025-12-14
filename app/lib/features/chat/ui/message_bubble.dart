@@ -18,6 +18,7 @@ class MessageBubble extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isUser = message.role == 'user';
+    final hasContent = message.content.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -26,36 +27,39 @@ class MessageBubble extends ConsumerWidget {
             ? CrossAxisAlignment.end
             : CrossAxisAlignment.start,
         children: [
-          // メッセージバブル
-          Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.7,
-            ),
-            decoration: BoxDecoration(
-              color: isUser ? AppColors.primary : AppColors.sidebarLight,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: Radius.circular(isUser ? 16 : 4),
-                bottomRight: Radius.circular(isUser ? 4 : 16),
+          // メッセージバブル（コンテンツがある場合のみ表示）
+          if (hasContent)
+            Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.7,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
+              decoration: BoxDecoration(
+                color: isUser ? AppColors.primary : AppColors.sidebarLight,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(16),
+                  topRight: const Radius.circular(16),
+                  bottomLeft: Radius.circular(isUser ? 16 : 4),
+                  bottomRight: Radius.circular(isUser ? 4 : 16),
                 ),
-              ],
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Text(
-              message.content,
-              style: TextStyle(
-                color: isUser ? AppColors.textOnPrimary : AppColors.textPrimary,
-                fontSize: 15,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Text(
+                message.content,
+                style: TextStyle(
+                  color: isUser
+                      ? AppColors.textOnPrimary
+                      : AppColors.textPrimary,
+                  fontSize: 15,
+                ),
               ),
             ),
-          ),
 
           // 画像生成セクション（存在する場合のみ）
           if (imageJob != null) _buildImageSection(context, ref, imageJob!),

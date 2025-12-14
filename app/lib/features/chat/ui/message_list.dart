@@ -80,38 +80,10 @@ class MessageList extends ConsumerWidget {
   Widget _buildImageJobCard(BuildContext context, ImageJob job) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // プロンプト表示
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.brush, color: AppColors.primary, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    job.prompt,
-                    style: TextStyle(color: Colors.grey[700], fontSize: 14),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          // 画像部分を MessageBubble に委譲
-          MessageBubble(
-            message: Message(id: job.id, role: 'model', content: ''),
-            imageJob: job,
-          ),
-        ],
+      // 画像部分を MessageBubble に委譲（プロンプトは非表示）
+      child: MessageBubble(
+        message: Message(id: job.id, role: 'model', content: ''),
+        imageJob: job,
       ),
     );
   }
