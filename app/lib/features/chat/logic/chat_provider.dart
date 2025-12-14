@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +23,19 @@ class ChatNotifier extends Notifier<ChatState> {
   FlutterSoundPlayer? _player;
   StreamSubscription? _audioSubscription;
   StreamController<Uint8List>? _recordingController;
+
+  /// Gemini Live API が期待するサンプルレート
+  static const int _targetSampleRate = 16000;
+
+  /// Web ブラウザのデフォルトサンプルレート（Windows Chrome）
+  ///
+  /// Web環境では FlutterSound が指定したサンプルレートを無視し、
+  /// OSのデフォルト（多くの場合 48000Hz）を使用するため、
+  /// リサンプリングが必要。
+  ///
+  /// 注意: macOS では 44100Hz の場合がある。
+  /// 他の環境で使用する場合はこの値の調整が必要。
+  static const int _webInputSampleRate = 48000;
 
   @override
   ChatState build() {
@@ -74,10 +88,30 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
+  /// ページロード時に初期化とWebSocket接続を同時に開始する。
+  ///
+  /// ユーザーにはマイクボタン1タップで会話開始できる状態を提供する。
+  /// [chatId] が指定されない場合は新規chatIdを生成する。
+  Future<void> initAndConnect({String? chatId}) async {
+    await init();
+    final targetChatId = chatId ?? _generateUuid();
+    await _connectToChat(targetChatId);
+  }
+
+  /// チャットを切り替える。
+  ///
+  /// 既存の接続を切断し、新しいchatIdで再接続する。
+  Future<void> switchChat(String chatId) async {
+    if (state.chatId == chatId) return;
+    await disconnect();
+    await _connectToChat(chatId);
+  }
+
   /// 新しいチャットセッションを開始する。
   ///
   /// UUID ベースの新規 chatId を生成し接続する。
   Future<void> startNewChat() async {
+    await disconnect();
     // UUID v4 形式の chatId を生成
     final chatId = _generateUuid();
     await _connectToChat(chatId);
@@ -193,10 +227,14 @@ class ChatNotifier extends Notifier<ChatState> {
     try {
       state = state.copyWith(status: ChatStatus.recording);
 
-      // 録音ストリームの作成
+      // 録音ストリームの作成（リサンプリングして送信）
       _recordingController = StreamController<Uint8List>();
       _recordingController!.stream.listen((data) {
-        _repository.sendAudio(data);
+        // Web環境では常にリサンプリング（48kHz → 16kHz）
+        final audioToSend = kIsWeb
+            ? _resampleAudio(data, _webInputSampleRate, _targetSampleRate)
+            : data;
+        _repository.sendAudio(audioToSend);
       });
 
       // 録音開始
@@ -204,8 +242,12 @@ class ChatNotifier extends Notifier<ChatState> {
         toStream: _recordingController!.sink,
         codec: Codec.pcm16,
         numChannels: 1,
-        sampleRate: 16000,
+        sampleRate: _targetSampleRate,
         bufferSize: 8192,
+      );
+
+      debugPrint(
+        'Recording started - Resampling: $_webInputSampleRate Hz -> $_targetSampleRate Hz',
       );
     } catch (e) {
       state = state.copyWith(
@@ -213,6 +255,35 @@ class ChatNotifier extends Notifier<ChatState> {
         errorMessage: 'Failed to start recording: $e',
       );
     }
+  }
+
+  /// 音声データを目標サンプルレートにリサンプリングする。
+  ///
+  /// PCM16 形式（サンプルあたり2バイト）のデータを想定。
+  /// 48kHz → 16kHz は 3:1 の整数比で効率的にダウンサンプリング。
+  Uint8List _resampleAudio(Uint8List input, int fromRate, int toRate) {
+    // PCM16 はサンプルあたり 2 バイト
+    final inputSamples = input.buffer.asInt16List(
+      input.offsetInBytes,
+      input.lengthInBytes ~/ 2,
+    );
+
+    // リサンプリング比率を計算 (48000/16000 = 3)
+    final ratio = fromRate / toRate;
+    final outputLength = (inputSamples.length / ratio).floor();
+
+    // 出力バッファを作成
+    final outputSamples = Int16List(outputLength);
+
+    // 単純な間引きでダウンサンプリング
+    for (int i = 0; i < outputLength; i++) {
+      final srcIndex = (i * ratio).floor();
+      if (srcIndex < inputSamples.length) {
+        outputSamples[i] = inputSamples[srcIndex];
+      }
+    }
+
+    return Uint8List.view(outputSamples.buffer);
   }
 
   /// 録音を停止する。
@@ -250,8 +321,18 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
-  /// セッションを切断する。
-  void disconnect() {
+  /// セッションを切断し、マイクを解放する。
+  Future<void> disconnect() async {
+    // 録音中の場合は停止
+    if (state.status == ChatStatus.recording) {
+      await stopRecording();
+    }
+
+    // レコーダーを閉じてマイクを完全に解放（ブラウザのインジケーターも消える）
+    await _recorder?.closeRecorder();
+    _recorder = null;
+
+    // WebSocket切断
     _repository.disconnect();
     state = state.copyWith(status: ChatStatus.disconnected, chatId: null);
   }

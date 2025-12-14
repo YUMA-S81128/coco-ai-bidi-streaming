@@ -3,8 +3,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'config/app_theme.dart';
 import 'features/auth/login_screen.dart';
-import 'features/chat/ui/chat_list_screen.dart';
+import 'features/chat/ui/home_screen.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -20,10 +21,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Gemini Live Streaming',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.light,
       home: const AuthWrapper(),
     );
   }
@@ -45,9 +45,9 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        // 認証済み → チャット一覧画面
+        // 認証済み → ホーム画面（サイドバー + チャット）
         if (snapshot.hasData) {
-          return const ChatListScreen();
+          return const HomeScreen();
         }
 
         // 未認証 → ログイン画面

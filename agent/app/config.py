@@ -29,7 +29,7 @@ class Settings(BaseSettings):
         default=None, description="Google CloudプロジェクトID"
     )
     google_cloud_location: str = Field(
-        default="asia-northeast1", description="Google Cloudロケーション"
+        default="us-central1", description="Google Cloudロケーション"
     )
 
     # Vertex AI Agent Engine Settings

@@ -111,7 +111,7 @@ serviceAccount: "projects/${PROJECT_ID}/serviceAccounts/coco-ai-bidi-cloudbuild-
 
 substitutions:
   _DEPLOY_TARGET: "all"
-  _GOOGLE_CLOUD_LOCATION: "asia-northeast1"
+  _GOOGLE_CLOUD_LOCATION: "us-central1"
   _BACKEND_SA_NAME: "coco-ai-bidi-backend-sa"
   _BACKEND_SERVICE_NAME: "coco-ai-bidi-streaming-backend"
   _ARTIFACT_REGISTRY_REPO: "coco-ai-bidi-streaming"
