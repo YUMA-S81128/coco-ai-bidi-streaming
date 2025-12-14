@@ -5,7 +5,7 @@
 #
 
 # --- Basic Settings ---
-export GOOGLE_CLOUD_LOCATION="asia-northeast1"
+export GOOGLE_CLOUD_LOCATION="us-central1"
 
 # --- Service Names ---
 export BACKEND_SERVICE_NAME="coco-ai-bidi-streaming-backend"

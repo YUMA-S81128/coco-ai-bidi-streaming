@@ -186,7 +186,7 @@ import os
 
 # プロジェクトIDとロケーションを設定
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "YOUR_PROJECT_ID")
-LOCATION = "asia-northeast1"
+LOCATION = "us-central1"
 
 # Clientの初期化 (v1beta1 APIを使用)
 client = vertexai.Client(

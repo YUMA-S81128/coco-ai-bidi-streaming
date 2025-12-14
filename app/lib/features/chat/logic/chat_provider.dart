@@ -89,7 +89,7 @@ class ChatNotifier extends Notifier<ChatState> {
   /// 既存の接続を切断し、新しいchatIdで再接続する。
   Future<void> switchChat(String chatId) async {
     if (state.chatId == chatId) return;
-    disconnect();
+    await disconnect();
     await _connectToChat(chatId);
   }
 
@@ -97,7 +97,7 @@ class ChatNotifier extends Notifier<ChatState> {
   ///
   /// UUID ベースの新規 chatId を生成し接続する。
   Future<void> startNewChat() async {
-    disconnect();
+    await disconnect();
     // UUID v4 形式の chatId を生成
     final chatId = _generateUuid();
     await _connectToChat(chatId);
@@ -270,8 +270,18 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
-  /// セッションを切断する。
-  void disconnect() {
+  /// セッションを切断し、マイクを解放する。
+  Future<void> disconnect() async {
+    // 録音中の場合は停止
+    if (state.status == ChatStatus.recording) {
+      await stopRecording();
+    }
+
+    // レコーダーを閉じてマイクを完全に解放（ブラウザのインジケーターも消える）
+    await _recorder?.closeRecorder();
+    _recorder = null;
+
+    // WebSocket切断
     _repository.disconnect();
     state = state.copyWith(status: ChatStatus.disconnected, chatId: null);
   }
