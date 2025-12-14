@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +23,12 @@ class ChatNotifier extends Notifier<ChatState> {
   FlutterSoundPlayer? _player;
   StreamSubscription? _audioSubscription;
   StreamController<Uint8List>? _recordingController;
+
+  /// Gemini Live API が期待するサンプルレート
+  static const int _targetSampleRate = 16000;
+
+  /// 実際の録音サンプルレート（Web環境ではOSに依存）
+  int? _actualSampleRate;
 
   @override
   ChatState build() {
@@ -216,7 +223,9 @@ class ChatNotifier extends Notifier<ChatState> {
       // 録音ストリームの作成
       _recordingController = StreamController<Uint8List>();
       _recordingController!.stream.listen((data) {
-        _repository.sendAudio(data);
+        // リサンプリングが必要な場合は変換してから送信
+        final audioToSend = _resampleIfNeeded(data);
+        _repository.sendAudio(audioToSend);
       });
 
       // 録音開始
@@ -224,15 +233,72 @@ class ChatNotifier extends Notifier<ChatState> {
         toStream: _recordingController!.sink,
         codec: Codec.pcm16,
         numChannels: 1,
-        sampleRate: 16000,
+        sampleRate: _targetSampleRate,
         bufferSize: 8192,
       );
+
+      // 実際のサンプルレートを取得（Web環境ではOSのデフォルトが使われる可能性）
+      _actualSampleRate = await _recorder!.getSampleRate();
+      debugPrint(
+        'Recording started - Target: $_targetSampleRate Hz, '
+        'Actual: $_actualSampleRate Hz',
+      );
+
+      // リサンプリングが必要かどうかをログ出力
+      if (_actualSampleRate != null && _actualSampleRate != _targetSampleRate) {
+        debugPrint(
+          'Resampling enabled: $_actualSampleRate Hz -> $_targetSampleRate Hz',
+        );
+      }
     } catch (e) {
       state = state.copyWith(
         status: ChatStatus.error,
         errorMessage: 'Failed to start recording: $e',
       );
     }
+  }
+
+  /// 必要に応じて音声データをリサンプリングする。
+  ///
+  /// Web環境ではブラウザがOS のサンプルレート（44.1kHz/48kHz）を使用するため、
+  /// Gemini Live API が期待する 16kHz に変換する必要がある。
+  Uint8List _resampleIfNeeded(Uint8List input) {
+    // サンプルレートが不明、または既に目標レートの場合はそのまま返す
+    if (_actualSampleRate == null || _actualSampleRate == _targetSampleRate) {
+      return input;
+    }
+
+    return _resampleAudio(input, _actualSampleRate!, _targetSampleRate);
+  }
+
+  /// 音声データを目標サンプルレートにリサンプリングする。
+  ///
+  /// PCM16 形式（サンプルあたり2バイト）のデータを想定。
+  /// 単純な間引きによるダウンサンプリングを行う。
+  Uint8List _resampleAudio(Uint8List input, int fromRate, int toRate) {
+    // PCM16 はサンプルあたり 2 バイト
+    final inputSamples = input.buffer.asInt16List(
+      input.offsetInBytes,
+      input.lengthInBytes ~/ 2,
+    );
+
+    // リサンプリング比率を計算
+    final ratio = fromRate / toRate;
+    final outputLength = (inputSamples.length / ratio).floor();
+
+    // 出力バッファを作成
+    final outputSamples = Int16List(outputLength);
+
+    // 単純な間引きでダウンサンプリング
+    // より高品質なリサンプリングが必要な場合は、線形補間やsinc補間を使用
+    for (int i = 0; i < outputLength; i++) {
+      final srcIndex = (i * ratio).floor();
+      if (srcIndex < inputSamples.length) {
+        outputSamples[i] = inputSamples[srcIndex];
+      }
+    }
+
+    return Uint8List.view(outputSamples.buffer);
   }
 
   /// 録音を停止する。
@@ -243,6 +309,7 @@ class ChatNotifier extends Notifier<ChatState> {
       await _recorder!.stopRecorder();
       await _recordingController?.close();
       _recordingController = null;
+      _actualSampleRate = null;
       state = state.copyWith(status: ChatStatus.connected);
     } catch (e) {
       state = state.copyWith(
