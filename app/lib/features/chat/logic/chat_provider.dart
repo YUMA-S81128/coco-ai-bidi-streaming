@@ -27,8 +27,15 @@ class ChatNotifier extends Notifier<ChatState> {
   /// Gemini Live API が期待するサンプルレート
   static const int _targetSampleRate = 16000;
 
-  /// 実際の録音サンプルレート（Web環境ではOSに依存）
-  int? _actualSampleRate;
+  /// Web ブラウザのデフォルトサンプルレート（Windows Chrome）
+  ///
+  /// Web環境では FlutterSound が指定したサンプルレートを無視し、
+  /// OSのデフォルト（多くの場合 48000Hz）を使用するため、
+  /// リサンプリングが必要。
+  ///
+  /// 注意: macOS では 44100Hz の場合がある。
+  /// 他の環境で使用する場合はこの値の調整が必要。
+  static const int _webInputSampleRate = 48000;
 
   @override
   ChatState build() {
@@ -220,11 +227,13 @@ class ChatNotifier extends Notifier<ChatState> {
     try {
       state = state.copyWith(status: ChatStatus.recording);
 
-      // 録音ストリームの作成
+      // 録音ストリームの作成（リサンプリングして送信）
       _recordingController = StreamController<Uint8List>();
       _recordingController!.stream.listen((data) {
-        // リサンプリングが必要な場合は変換してから送信
-        final audioToSend = _resampleIfNeeded(data);
+        // Web環境では常にリサンプリング（48kHz → 16kHz）
+        final audioToSend = kIsWeb
+            ? _resampleAudio(data, _webInputSampleRate, _targetSampleRate)
+            : data;
         _repository.sendAudio(audioToSend);
       });
 
@@ -237,19 +246,9 @@ class ChatNotifier extends Notifier<ChatState> {
         bufferSize: 8192,
       );
 
-      // 実際のサンプルレートを取得（Web環境ではOSのデフォルトが使われる可能性）
-      _actualSampleRate = await _recorder!.getSampleRate();
       debugPrint(
-        'Recording started - Target: $_targetSampleRate Hz, '
-        'Actual: $_actualSampleRate Hz',
+        'Recording started - Resampling: $_webInputSampleRate Hz -> $_targetSampleRate Hz',
       );
-
-      // リサンプリングが必要かどうかをログ出力
-      if (_actualSampleRate != null && _actualSampleRate != _targetSampleRate) {
-        debugPrint(
-          'Resampling enabled: $_actualSampleRate Hz -> $_targetSampleRate Hz',
-        );
-      }
     } catch (e) {
       state = state.copyWith(
         status: ChatStatus.error,
@@ -258,23 +257,10 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
-  /// 必要に応じて音声データをリサンプリングする。
-  ///
-  /// Web環境ではブラウザがOS のサンプルレート（44.1kHz/48kHz）を使用するため、
-  /// Gemini Live API が期待する 16kHz に変換する必要がある。
-  Uint8List _resampleIfNeeded(Uint8List input) {
-    // サンプルレートが不明、または既に目標レートの場合はそのまま返す
-    if (_actualSampleRate == null || _actualSampleRate == _targetSampleRate) {
-      return input;
-    }
-
-    return _resampleAudio(input, _actualSampleRate!, _targetSampleRate);
-  }
-
   /// 音声データを目標サンプルレートにリサンプリングする。
   ///
   /// PCM16 形式（サンプルあたり2バイト）のデータを想定。
-  /// 単純な間引きによるダウンサンプリングを行う。
+  /// 48kHz → 16kHz は 3:1 の整数比で効率的にダウンサンプリング。
   Uint8List _resampleAudio(Uint8List input, int fromRate, int toRate) {
     // PCM16 はサンプルあたり 2 バイト
     final inputSamples = input.buffer.asInt16List(
@@ -282,7 +268,7 @@ class ChatNotifier extends Notifier<ChatState> {
       input.lengthInBytes ~/ 2,
     );
 
-    // リサンプリング比率を計算
+    // リサンプリング比率を計算 (48000/16000 = 3)
     final ratio = fromRate / toRate;
     final outputLength = (inputSamples.length / ratio).floor();
 
@@ -290,7 +276,6 @@ class ChatNotifier extends Notifier<ChatState> {
     final outputSamples = Int16List(outputLength);
 
     // 単純な間引きでダウンサンプリング
-    // より高品質なリサンプリングが必要な場合は、線形補間やsinc補間を使用
     for (int i = 0; i < outputLength; i++) {
       final srcIndex = (i * ratio).floor();
       if (srcIndex < inputSamples.length) {
@@ -309,7 +294,6 @@ class ChatNotifier extends Notifier<ChatState> {
       await _recorder!.stopRecorder();
       await _recordingController?.close();
       _recordingController = null;
-      _actualSampleRate = null;
       state = state.copyWith(status: ChatStatus.connected);
     } catch (e) {
       state = state.copyWith(

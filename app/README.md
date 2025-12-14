@@ -49,3 +49,31 @@ Web開発サーバーを起動します。
 ```bash
 flutter run -d chrome
 ```
+
+## 5. 注意事項
+
+### 音声リサンプリングについて
+
+本アプリケーションは **Windows Chrome** での動作を前提としています。
+
+Web環境では、FlutterSoundがブラウザのデフォルトサンプルレート（Windows Chrome: 48kHz）を使用するため、Gemini Live APIが期待する16kHzへのリサンプリングを行っています。
+
+**他の環境で使用する場合**:
+
+| 環境 | 想定サンプルレート |
+|------|------------------|
+| Windows Chrome | 48000 Hz |
+| macOS Chrome/Safari | 44100 Hz または 48000 Hz |
+| Linux Chrome | 48000 Hz |
+| iOS Safari | 48000 Hz |
+| Android Chrome | 44100 Hz または 48000 Hz |
+
+> **注意**: モバイルブラウザでは、マイク入力の挙動がデスクトップと異なる場合があります。また、一部のモバイルブラウザでは `flutter_sound` の Web 実装が正常に動作しない可能性があります。
+
+macOS など他の環境で使用する場合は、`chat_provider.dart` の `_webInputSampleRate` 定数を適切な値に変更してください。
+
+```dart
+// chat_provider.dart
+static const int _webInputSampleRate = 48000; // ← 環境に合わせて変更
+```
+
