@@ -90,6 +90,13 @@ class ChatArea extends ConsumerWidget {
       notifier.stopRecording();
     } else if (state.status == ChatStatus.connected) {
       notifier.startRecording();
+    } else if (state.status == ChatStatus.disconnected) {
+      // 切断状態: chatId があれば再接続+録音開始、なければ新規チャット
+      if (state.chatId != null) {
+        notifier.resumeAndStartRecording(state.chatId!);
+      } else {
+        notifier.startNewChat();
+      }
     } else if (state.status == ChatStatus.error) {
       // エラー時は再接続
       if (state.chatId != null) {
