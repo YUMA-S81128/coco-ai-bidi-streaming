@@ -173,14 +173,15 @@ class ChatNotifier extends Notifier<ChatState> {
       // JSON メッセージをパース
       try {
         final json = jsonDecode(data);
-        // セッション終了シグナル
+        // セッション終了シグナル - 録音停止 + マイク解放
         if (json['type'] == 'end_session') {
-          stopRecording();
+          disconnect();
+          return;
         }
         // 他のイベント（音声データ含む）を処理
         _handleJsonEvent(json);
       } catch (_) {
-        debugPrint('Received text: $data');
+        // JSONパースエラーは無視
       }
     }
   }

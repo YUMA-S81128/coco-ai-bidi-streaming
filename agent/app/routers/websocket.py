@@ -191,6 +191,12 @@ async def websocket_endpoint(
         await asyncio.gather(upstream_task(), downstream_task())
     except SessionFinishedException:
         logger.info("Session ended by tool (User requested termination).")
+        # クライアントにセッション終了を通知
+        try:
+            await websocket.send_text('{"type":"end_session"}')
+            logger.info("Sent end_session event to client")
+        except Exception as e:
+            logger.warning(f"Failed to send end_session: {e}")
     except Exception as e:
         logger.error(f"セッション全体のエラー: {e}")
     finally:
