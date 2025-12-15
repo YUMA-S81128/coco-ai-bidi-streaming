@@ -334,7 +334,7 @@ class ChatNotifier extends Notifier<ChatState> {
           codec: Codec.pcm16,
           numChannels: 1,
           sampleRate: 24000,
-          interleaved: false,
+          interleaved: true,
           bufferSize: 8192,
         );
       }
