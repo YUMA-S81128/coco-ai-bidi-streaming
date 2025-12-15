@@ -117,6 +117,28 @@ class ChatNotifier extends Notifier<ChatState> {
     await _connectToChat(chatId);
   }
 
+  /// 既存のチャットセッションを再開し、録音を開始する。
+  ///
+  /// セッション終了後にボタン1回で会話を再開するためのメソッド。
+  Future<void> resumeAndStartRecording(String chatId) async {
+    // レコーダーが閉じられている場合は再初期化
+    if (_recorder == null) {
+      _recorder = FlutterSoundRecorder();
+      await _recorder!.openRecorder();
+    }
+    // プレイヤーが閉じられている場合は再初期化
+    if (_player == null) {
+      _player = FlutterSoundPlayer();
+      await _player!.openPlayer();
+    }
+
+    await _connectToChat(chatId);
+    // 接続完了後、自動的に録音開始
+    if (state.status == ChatStatus.connected) {
+      await startRecording();
+    }
+  }
+
   /// 既存のチャットセッションを再開する。
   ///
   /// [chatId] 指定したチャットに接続する。
@@ -349,13 +371,15 @@ class ChatNotifier extends Notifier<ChatState> {
   ///
   /// [disconnect] とは異なり、chatId を保持してチャット内容を表示し続ける。
   /// バックエンドからの end_session イベント受信時に使用。
+  /// プレイヤーは再開時に必要なので閉じない。
   Future<void> endSession() async {
     // 録音中の場合は停止
     if (state.status == ChatStatus.recording) {
       await stopRecording();
     }
 
-    // レコーダーを閉じてマイクを完全に解放（ブラウザのインジケーターも消える）
+    // レコーダーのみ閉じてマイクを解放（ブラウザのインジケーターが消える）
+    // プレイヤーは保持（再開時に音声再生に必要）
     await _recorder?.closeRecorder();
     _recorder = null;
 
