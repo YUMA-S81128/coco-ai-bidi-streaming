@@ -2,7 +2,7 @@
 
 ## 1. 概要
 
-本ディレクトリは、[Gemini Live Streaming Agent プロジェクト](../AGENTS.md)のバックエンド部分であるADKエージェントの実装です。
+本ディレクトリは、Gemini Live Streaming Agent プロジェクトのバックエンド部分であるADKエージェントの実装です。
 Python, FastAPI, ADK (Agent Development Kit) を用いて構築されており、リアルタイムの音声ストリーミング中継と、会話に応じたツール（画像生成ジョブ発行など）の実行を担当します。
 
 デプロイ先は **Google Cloud Run (BFF構成)** です。
@@ -31,7 +31,7 @@ Python, FastAPI, ADK (Agent Development Kit) を用いて構築されており�
 -   **Firebase連携:** `firebase-admin` SDK を使用し、Firestoreへのデータ書き込みなどを行います。
 -   **パッケージ管理:** `uv`
 
-詳細なアーキテクチャやシーケンス図については、プロジェクトルートの [`AGENTS.md`](../AGENTS.md) を参照してください。
+詳細なアーキテクチャやシーケンス図については、プロジェクトルートの [`README.md`](../README.md) を参照してください。
 
 ## 4. 開発
 
