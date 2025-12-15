@@ -151,6 +151,7 @@ class ChatNotifier extends Notifier<ChatState> {
           debugPrint('WebSocket stream closed (onDone)');
           // 録音中に接続が切れた場合は録音を停止
           if (state.status == ChatStatus.recording) {
+            debugPrint('Stream closed while recording, stopping...');
             stopRecording();
           }
           state = state.copyWith(status: ChatStatus.disconnected);
@@ -173,8 +174,10 @@ class ChatNotifier extends Notifier<ChatState> {
       // JSON メッセージをパース
       try {
         final json = jsonDecode(data);
+        debugPrint('WebSocket received: ${json['type'] ?? 'event'}');
         // セッション終了シグナル - 録音停止 + マイク解放
         if (json['type'] == 'end_session') {
+          debugPrint('end_session received, calling disconnect()');
           disconnect();
           return;
         }
