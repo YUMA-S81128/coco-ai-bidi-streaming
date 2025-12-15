@@ -182,6 +182,15 @@ async def websocket_endpoint(
                 # 文字起こし完了イベントを Firestore に保存
                 await _save_transcription_if_finished(event, chat_id)
 
+        except SessionFinishedException:
+            # セッション終了: クライアントに通知してから再スロー
+            logger.info("SessionFinishedException caught in downstream_task")
+            try:
+                await websocket.send_text('{"type":"end_session"}')
+                logger.info("Sent end_session event to client from downstream_task")
+            except Exception as e:
+                logger.warning(f"Failed to send end_session: {e}")
+            raise  # 外側の asyncio.gather に伝播させる
         except Exception as e:
             logger.error(f"Downstream エラー: {e}")
             # エラー発生時も適切にクローズ処理へ
@@ -191,6 +200,12 @@ async def websocket_endpoint(
         await asyncio.gather(upstream_task(), downstream_task())
     except SessionFinishedException:
         logger.info("Session ended by tool (User requested termination).")
+        # クライアントにセッション終了を通知
+        try:
+            await websocket.send_text('{"type":"end_session"}')
+            logger.info("Sent end_session event to client")
+        except Exception as e:
+            logger.warning(f"Failed to send end_session: {e}")
     except Exception as e:
         logger.error(f"セッション全体のエラー: {e}")
     finally:

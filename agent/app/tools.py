@@ -18,7 +18,12 @@ class SessionFinishedException(Exception):
 
 async def end_session_tool() -> None:
     """
-    ユーザーがさようならを言ったり、停止を求めたりしたときに現在のセッションを終了します。
+    ユーザーがさようならを言ったり、会話の終了を求めたりしたときに現在のセッションを終了します。
+
+    重要: このツールを呼び出す前に、必ずユーザーにお別れのメッセージを音声で伝えてください。
+    例: 「ありがとうございました！またお話しできるのを楽しみにしています。さようなら！」
+
+    このツールを呼び出すと、セッションが終了し、接続が閉じられます。
     """
     logger.info("end_session_tool called. Raising SessionFinishedException.")
     raise SessionFinishedException("Session ended by user.")

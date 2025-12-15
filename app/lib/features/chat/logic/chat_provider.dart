@@ -117,6 +117,28 @@ class ChatNotifier extends Notifier<ChatState> {
     await _connectToChat(chatId);
   }
 
+  /// 既存のチャットセッションを再開し、録音を開始する。
+  ///
+  /// セッション終了後にボタン1回で会話を再開するためのメソッド。
+  Future<void> resumeAndStartRecording(String chatId) async {
+    // レコーダーが閉じられている場合は再初期化
+    if (_recorder == null) {
+      _recorder = FlutterSoundRecorder();
+      await _recorder!.openRecorder();
+    }
+    // プレイヤーが閉じられている場合は再初期化
+    if (_player == null) {
+      _player = FlutterSoundPlayer();
+      await _player!.openPlayer();
+    }
+
+    await _connectToChat(chatId);
+    // 接続完了後、自動的に録音開始
+    if (state.status == ChatStatus.connected) {
+      await startRecording();
+    }
+  }
+
   /// 既存のチャットセッションを再開する。
   ///
   /// [chatId] 指定したチャットに接続する。
@@ -151,6 +173,7 @@ class ChatNotifier extends Notifier<ChatState> {
           debugPrint('WebSocket stream closed (onDone)');
           // 録音中に接続が切れた場合は録音を停止
           if (state.status == ChatStatus.recording) {
+            debugPrint('Stream closed while recording, stopping...');
             stopRecording();
           }
           state = state.copyWith(status: ChatStatus.disconnected);
@@ -173,31 +196,46 @@ class ChatNotifier extends Notifier<ChatState> {
       // JSON メッセージをパース
       try {
         final json = jsonDecode(data);
-        // セッション終了シグナル
+        // セッション終了シグナル - 録音停止 + マイク解放（チャットは保持）
         if (json['type'] == 'end_session') {
-          stopRecording();
+          endSession();
+          return;
         }
         // 他のイベント（音声データ含む）を処理
         _handleJsonEvent(json);
       } catch (_) {
-        debugPrint('Received text: $data');
+        // JSONパースエラーは無視
       }
     }
   }
 
   /// JSON イベントを処理する。
+  ///
+  /// ADK LiveEvent の構造から音声データを抽出して再生する。
+  /// 音声データは content.parts[n].inline_data.data にbase64エンコードで格納されている。
   void _handleJsonEvent(Map<String, dynamic> json) {
-    // audio フィールドがある場合は再生
-    // ADK の LiveEvent からの音声データを想定
-    final audioData = json['audio'];
-    if (audioData != null && audioData is Map) {
-      final data = audioData['data'];
-      if (data != null && data is String) {
-        try {
-          final bytes = base64Decode(data);
-          _playAudio(bytes);
-        } catch (e) {
-          debugPrint('Failed to decode audio: $e');
+    // ADK LiveEvent から音声データを抽出
+    // 構造: { "content": { "parts": [{ "inline_data": { "data": "base64...", "mime_type": "..." } }] } }
+    final content = json['content'];
+    if (content != null && content is Map) {
+      final parts = content['parts'];
+      if (parts != null && parts is List) {
+        for (final part in parts) {
+          if (part is Map) {
+            // inline_data または inlineData (camelCase) をサポート
+            final inlineData = part['inline_data'] ?? part['inlineData'];
+            if (inlineData != null && inlineData is Map) {
+              final data = inlineData['data'];
+              if (data != null && data is String) {
+                try {
+                  final bytes = base64Decode(data);
+                  _playAudio(bytes);
+                } catch (_) {
+                  // base64デコードエラーは無視
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -319,7 +357,7 @@ class ChatNotifier extends Notifier<ChatState> {
           codec: Codec.pcm16,
           numChannels: 1,
           sampleRate: 24000,
-          interleaved: false,
+          interleaved: true,
           bufferSize: 8192,
         );
       }
@@ -329,7 +367,33 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
+  /// セッションを終了し、マイクを解放する。
+  ///
+  /// [disconnect] とは異なり、chatId を保持してチャット内容を表示し続ける。
+  /// バックエンドからの end_session イベント受信時に使用。
+  /// プレイヤーは再開時に必要なので閉じない。
+  Future<void> endSession() async {
+    // 録音中の場合は停止
+    if (state.status == ChatStatus.recording) {
+      await stopRecording();
+    }
+
+    // レコーダーのみ閉じてマイクを解放（ブラウザのインジケーターが消える）
+    // プレイヤーは保持（再開時に音声再生に必要）
+    await _recorder?.closeRecorder();
+    _recorder = null;
+
+    // WebSocket切断
+    _repository.disconnect();
+
+    // chatId は保持してチャット内容を表示し続ける
+    state = state.copyWith(status: ChatStatus.disconnected);
+  }
+
   /// セッションを切断し、マイクを解放する。
+  ///
+  /// chatId をクリアして初期画面に戻る。
+  /// ユーザーが他のチャットに切り替える時に使用。
   Future<void> disconnect() async {
     // 録音中の場合は停止
     if (state.status == ChatStatus.recording) {
