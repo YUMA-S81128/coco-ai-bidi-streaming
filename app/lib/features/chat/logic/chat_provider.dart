@@ -174,11 +174,9 @@ class ChatNotifier extends Notifier<ChatState> {
       // JSON メッセージをパース
       try {
         final json = jsonDecode(data);
-        debugPrint('WebSocket received: ${json['type'] ?? 'event'}');
-        // セッション終了シグナル - 録音停止 + マイク解放
+        // セッション終了シグナル - 録音停止 + マイク解放（チャットは保持）
         if (json['type'] == 'end_session') {
-          debugPrint('end_session received, calling disconnect()');
-          disconnect();
+          endSession();
           return;
         }
         // 他のイベント（音声データ含む）を処理
@@ -347,7 +345,31 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
+  /// セッションを終了し、マイクを解放する。
+  ///
+  /// [disconnect] とは異なり、chatId を保持してチャット内容を表示し続ける。
+  /// バックエンドからの end_session イベント受信時に使用。
+  Future<void> endSession() async {
+    // 録音中の場合は停止
+    if (state.status == ChatStatus.recording) {
+      await stopRecording();
+    }
+
+    // レコーダーを閉じてマイクを完全に解放（ブラウザのインジケーターも消える）
+    await _recorder?.closeRecorder();
+    _recorder = null;
+
+    // WebSocket切断
+    _repository.disconnect();
+
+    // chatId は保持してチャット内容を表示し続ける
+    state = state.copyWith(status: ChatStatus.disconnected);
+  }
+
   /// セッションを切断し、マイクを解放する。
+  ///
+  /// chatId をクリアして初期画面に戻る。
+  /// ユーザーが他のチャットに切り替える時に使用。
   Future<void> disconnect() async {
     // 録音中の場合は停止
     if (state.status == ChatStatus.recording) {
