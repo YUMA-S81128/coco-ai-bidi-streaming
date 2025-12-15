@@ -186,18 +186,32 @@ class ChatNotifier extends Notifier<ChatState> {
   }
 
   /// JSON イベントを処理する。
+  ///
+  /// ADK LiveEvent の構造から音声データを抽出して再生する。
+  /// 音声データは content.parts[n].inline_data.data にbase64エンコードで格納されている。
   void _handleJsonEvent(Map<String, dynamic> json) {
-    // audio フィールドがある場合は再生
-    // ADK の LiveEvent からの音声データを想定
-    final audioData = json['audio'];
-    if (audioData != null && audioData is Map) {
-      final data = audioData['data'];
-      if (data != null && data is String) {
-        try {
-          final bytes = base64Decode(data);
-          _playAudio(bytes);
-        } catch (e) {
-          debugPrint('Failed to decode audio: $e');
+    // ADK LiveEvent から音声データを抽出
+    // 構造: { "content": { "parts": [{ "inline_data": { "data": "base64...", "mime_type": "..." } }] } }
+    final content = json['content'];
+    if (content != null && content is Map) {
+      final parts = content['parts'];
+      if (parts != null && parts is List) {
+        for (final part in parts) {
+          if (part is Map) {
+            // inline_data または inlineData (camelCase) をサポート
+            final inlineData = part['inline_data'] ?? part['inlineData'];
+            if (inlineData != null && inlineData is Map) {
+              final data = inlineData['data'];
+              if (data != null && data is String) {
+                try {
+                  final bytes = base64Decode(data);
+                  _playAudio(bytes);
+                } catch (_) {
+                  // base64デコードエラーは無視
+                }
+              }
+            }
+          }
         }
       }
     }
