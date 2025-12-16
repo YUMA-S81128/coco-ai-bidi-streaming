@@ -10,7 +10,9 @@ from google.genai import types
 from app.services.firestore_service import (
     ensure_chat_exists,
     ensure_user_exists,
+    get_session_id_for_chat,
     save_message,
+    set_session_id_for_chat,
 )
 from app.tools import SessionFinishedException
 
@@ -38,7 +40,6 @@ async def websocket_endpoint(
         response_mode: レスポンスのモード。"audio" (デフォルト) または "text"。
     """
     # 接続受け入れ前に必須パラメータを検証
-    # 無効な接続を早期に拒否し、リソースを節約
     if not token or not chat_id:
         logger.warning(
             f"必須パラメータ不足: token={bool(token)}, chat_id={bool(chat_id)}"
@@ -73,12 +74,13 @@ async def websocket_endpoint(
     app_name = websocket.app.state.app_name
 
     # セッションの取得または作成
-    # VertexAiSessionService は pre-set session_id をサポートしないため、
-    # Firestore に保存された session_id を使用するか、新規作成する
-    from app.services.firestore_service import (
-        get_session_id_for_chat,
-        set_session_id_for_chat,
-    )
+    #
+    # VertexAiSessionService は create_session() 時にカスタム session_id を
+    # 指定できない（自動生成のみ対応）ため、以下の手順で管理する：
+    # 1. Firestore に保存済みの session_id があれば、
+    #    それを使って既存セッションを取得
+    # 2. なければ create_session() で新規作成し、
+    #    自動生成した session_id を Firestore に保存
 
     session = None
     session_id = await get_session_id_for_chat(chat_id)
@@ -103,7 +105,7 @@ async def websocket_endpoint(
         )
         # 自動生成された session_id を Firestore に保存し、変数も更新
         if session and session.id:
-            session_id = session.id  # 変数を更新
+            session_id = session.id
             await set_session_id_for_chat(chat_id, session_id)
             logger.info(f"Created new session: {session_id} for chat: {chat_id}")
         else:
@@ -115,7 +117,6 @@ async def websocket_endpoint(
     live_request_queue = LiveRequestQueue()
 
     # レスポンスモードの設定
-    # types.Modality enum を使用
     response_modalities = [types.Modality.AUDIO]
     output_audio_transcription = types.AudioTranscriptionConfig()
 
